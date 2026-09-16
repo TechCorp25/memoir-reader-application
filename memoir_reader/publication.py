@@ -53,6 +53,8 @@ def build_publication_payload(snapshot: SnapshotLike, authority: FrontMatterAuth
     return {
         "repository": snapshot.repository,
         "commit_sha": snapshot.commit_sha,
+        "book_title": authority.book_title,
+        "dedication_presentation": authority.dedication.presentation,
         "manuscript_total_pages": snapshot.total_pages,
         "front_matter_pages": FRONT_MATTER_PAGE_COUNT,
         "physical_total_pages": len(pages),
