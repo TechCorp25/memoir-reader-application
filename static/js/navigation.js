@@ -1,7 +1,8 @@
-export const SPREAD_MIN_WIDTH = 900;
+export const SPREAD_MIN_WIDTH = 640;
+export const SPREAD_MIN_ASPECT = 1.25;
 
 export function modeForViewport(width, height) {
-  return width >= SPREAD_MIN_WIDTH && width > height * 1.08 ? 'spread' : 'single';
+  return width >= SPREAD_MIN_WIDTH && width > height * SPREAD_MIN_ASPECT ? 'spread' : 'single';
 }
 
 // Legacy manuscript-only navigation remains unchanged until the physical-book
