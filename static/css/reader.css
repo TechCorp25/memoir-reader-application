@@ -211,16 +211,18 @@ body {
 
 .title-page h1 {
   margin: 0;
-  max-width: 98%;
+  inline-size: 92%;
+  max-inline-size: 92cqw;
   font-family: var(--cover-title-face);
-  font-size: clamp(.95rem, 3vmin, 2.25rem);
-  font-size: clamp(.95rem, 5.7cqw, 2.25rem);
+  font-size: min(2.6vmin, 2.25rem);
+  font-size: min(5cqw, 2.25rem);
   font-weight: 600;
   line-height: .96;
   letter-spacing: .04em;
   text-transform: uppercase;
   white-space: nowrap;
   text-wrap: nowrap;
+  text-align: center;
 }
 
 .page-dedication {
