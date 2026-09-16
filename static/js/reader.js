@@ -392,16 +392,11 @@ async function loadBook() {
   const controlledPendingAsset = publicationResponse.status === 503
     && publicationError.error === 'publication_assembly_unavailable'
     && String(publicationError.message || '').includes('AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED');
-  if (!controlledPendingAsset) {
-    throw new Error('The physical publication authority could not be verified.');
+  if (controlledPendingAsset) {
+    throw new Error('The approved front cover is not available, so the physical publication cannot be opened safely.');
   }
 
-  const legacyResponse = await fetch('/api/book', { headers: { Accept: 'application/json' } });
-  if (!legacyResponse.ok) throw new Error('The canonical publication source could not be verified.');
-  const book = await legacyResponse.json();
-  const pages = buildLegacyPageMap(book);
-  if (pages.length !== book.total_pages) throw new Error('Publication page map failed integrity validation.');
-  return { book, pages, physical: false };
+  throw new Error('The physical publication authority could not be verified.');
 }
 
 async function boot() {
