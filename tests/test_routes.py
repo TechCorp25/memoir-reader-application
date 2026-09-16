@@ -66,15 +66,25 @@ def ready_authority():
     )
 
 
-def test_health_keeps_canonical_reader_healthy_while_physical_assembly_is_blocked():
+def test_health_keeps_canonical_reader_healthy_while_physical_assembly_is_blocked(monkeypatch):
+    monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
     response = client_for(FakeSource()).get("/health")
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["status"] == "ok"
     assert payload["canonical_source"] == "techcorp-DevApps/memoir"
     assert payload["commit_sha"] == COMMIT
+    assert payload["application_commit"] is None
     assert payload["publication_assembly"]["status"] == "blocked"
     assert payload["publication_assembly"]["front_cover"] == "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED"
+
+
+def test_health_exposes_render_application_commit_for_deployment_verification(monkeypatch):
+    application_commit = "d" * 40
+    monkeypatch.setenv("RENDER_GIT_COMMIT", application_commit)
+    response = client_for(FakeSource()).get("/health")
+    assert response.status_code == 200
+    assert response.get_json()["application_commit"] == application_commit
 
 
 def test_publication_endpoint_fails_closed_until_exact_front_cover_is_materialized():
