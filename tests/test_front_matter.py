@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -46,16 +47,68 @@ def test_back_cover_authority_is_approved_and_sha_bound_but_not_yet_repository_m
 def test_canonical_repository_mismatch_is_rejected(tmp_path):
     payload = json.loads(AUTHORITY_PATH.read_text(encoding="utf-8"))
     payload["canonical_repository"] = "other/repo"
-    target = tmp_path / "front-matter-authority.json"
+    target = tmp_path / "publication" / "front-matter-authority.json"
+    target.parent.mkdir()
     target.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(PublicationAssemblyError, match="canonical repository"):
         load_front_matter_authority(target)
 
 
-def test_materialized_front_cover_requires_complete_provenance(tmp_path):
+def _materialized_authority(tmp_path: Path, image_bytes: bytes, sha256: str) -> Path:
     payload = json.loads(AUTHORITY_PATH.read_text(encoding="utf-8"))
-    payload["cover"]["approval_status"] = "AUTHOR_APPROVED"
-    target = tmp_path / "front-matter-authority.json"
+    payload["cover"] = {
+        "approval_status": "AUTHOR_APPROVED",
+        "asset_id": "front-cover-approved",
+        "asset_path": "publication/assets/front-cover.jpeg",
+        "sha256": sha256,
+        "mime_type": "image/jpeg",
+        "authority": "author:test",
+    }
+    authority_path = tmp_path / "publication" / "front-matter-authority.json"
+    asset_path = tmp_path / "publication" / "assets" / "front-cover.jpeg"
+    asset_path.parent.mkdir(parents=True)
+    asset_path.write_bytes(image_bytes)
+    authority_path.write_text(json.dumps(payload), encoding="utf-8")
+    return authority_path
+
+
+def test_materialized_front_cover_is_verified_by_exact_sha256(tmp_path):
+    image_bytes = b"\xff\xd8\xff\xe0approved-test-image"
+    sha256 = hashlib.sha256(image_bytes).hexdigest()
+    target = _materialized_authority(tmp_path, image_bytes, sha256)
+    authority = load_front_matter_authority(target)
+    assert authority.ready is True
+    assert authority.cover is not None
+    assert authority.cover.sha256 == sha256
+
+
+def test_materialized_front_cover_hash_mismatch_is_rejected(tmp_path):
+    image_bytes = b"\xff\xd8\xff\xe0approved-test-image"
+    target = _materialized_authority(tmp_path, image_bytes, "0" * 64)
+    with pytest.raises(PublicationAssemblyError, match="SHA-256 does not match"):
+        load_front_matter_authority(target)
+
+
+def test_materialized_front_cover_with_wrong_image_signature_is_rejected(tmp_path):
+    image_bytes = b"not-a-jpeg"
+    sha256 = hashlib.sha256(image_bytes).hexdigest()
+    target = _materialized_authority(tmp_path, image_bytes, sha256)
+    with pytest.raises(PublicationAssemblyError, match="do not match the approved image type"):
+        load_front_matter_authority(target)
+
+
+def test_materialized_front_cover_path_traversal_is_rejected(tmp_path):
+    payload = json.loads(AUTHORITY_PATH.read_text(encoding="utf-8"))
+    payload["cover"] = {
+        "approval_status": "AUTHOR_APPROVED",
+        "asset_id": "front-cover-approved",
+        "asset_path": "../outside.jpeg",
+        "sha256": "0" * 64,
+        "mime_type": "image/jpeg",
+        "authority": "author:test",
+    }
+    target = tmp_path / "publication" / "front-matter-authority.json"
+    target.parent.mkdir()
     target.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(PublicationAssemblyError, match="Front cover approval provenance"):
+    with pytest.raises(PublicationAssemblyError, match="asset path is invalid"):
         load_front_matter_authority(target)

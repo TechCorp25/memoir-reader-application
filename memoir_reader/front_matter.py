@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .assembly import ApprovedCover, ApprovedDedication, PublicationAssemblyError
@@ -61,7 +62,35 @@ def _required_mapping(payload: dict[str, Any], key: str) -> dict[str, Any]:
     return value
 
 
-def _load_cover(data: dict[str, Any], *, label: str, allow_unmaterialized: bool = False) -> tuple[str, ApprovedCover | None]:
+def _safe_asset_path(asset_root: Path, relative_path: str, label: str) -> Path:
+    posix = PurePosixPath(relative_path)
+    if posix.is_absolute() or ".." in posix.parts or not posix.parts:
+        raise PublicationAssemblyError(f"{label} asset path is invalid")
+    resolved_root = asset_root.resolve()
+    resolved_asset = (asset_root / Path(*posix.parts)).resolve()
+    if resolved_asset != resolved_root and resolved_root not in resolved_asset.parents:
+        raise PublicationAssemblyError(f"{label} asset path escapes the application root")
+    return resolved_asset
+
+
+def _validate_image_bytes(payload: bytes, mime_type: str, label: str) -> None:
+    signatures = {
+        "image/jpeg": lambda value: value.startswith(b"\xff\xd8\xff"),
+        "image/png": lambda value: value.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/webp": lambda value: len(value) >= 12 and value[:4] == b"RIFF" and value[8:12] == b"WEBP",
+    }
+    check = signatures.get(mime_type)
+    if check is None or not check(payload):
+        raise PublicationAssemblyError(f"{label} bytes do not match the approved image type")
+
+
+def _load_cover(
+    data: dict[str, Any],
+    *,
+    label: str,
+    asset_root: Path,
+    allow_unmaterialized: bool = False,
+) -> tuple[str, ApprovedCover | None]:
     status = str(data.get("approval_status") or "")
     if status == APPROVED:
         asset_id = str(data.get("asset_id") or "")
@@ -75,10 +104,21 @@ def _load_cover(data: dict[str, Any], *, label: str, allow_unmaterialized: bool 
             raise PublicationAssemblyError(f"{label} SHA-256 is invalid")
         if not mime_type.startswith("image/"):
             raise PublicationAssemblyError(f"{label} must be an image asset")
+
+        file_path = _safe_asset_path(asset_root, asset_path, label)
+        try:
+            payload = file_path.read_bytes()
+        except OSError as exc:
+            raise PublicationAssemblyError(f"{label} approved asset could not be read") from exc
+        actual_sha256 = hashlib.sha256(payload).hexdigest()
+        if actual_sha256.lower() != sha256.lower():
+            raise PublicationAssemblyError(f"{label} approved asset SHA-256 does not match authority")
+        _validate_image_bytes(payload, mime_type, label)
+
         return status, ApprovedCover(
             asset_id=asset_id,
             source=f"{authority}:{asset_path}",
-            sha256=sha256,
+            sha256=sha256.lower(),
             mime_type=mime_type,
             approved=True,
         )
@@ -94,8 +134,9 @@ def load_front_matter_authority(
     *,
     expected_canonical_repository: str = "techcorp-DevApps/memoir",
 ) -> FrontMatterAuthority:
+    authority_path = Path(path)
     try:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        payload = json.loads(authority_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise PublicationAssemblyError("Front-matter authority could not be loaded") from exc
 
@@ -128,9 +169,20 @@ def load_front_matter_authority(
         presentation=str(dedication_data.get("presentation") or "script"),
     )
 
-    cover_status, cover = _load_cover(_required_mapping(payload, "cover"), label="Front cover", allow_unmaterialized=True)
+    # The authority file lives under publication/. Approved asset paths are
+    # application-root-relative and therefore resolve one directory above it.
+    asset_root = authority_path.resolve().parent.parent
+    cover_status, cover = _load_cover(
+        _required_mapping(payload, "cover"),
+        label="Front cover",
+        asset_root=asset_root,
+        allow_unmaterialized=True,
+    )
     back_cover_status, back_cover = _load_cover(
-        _required_mapping(payload, "back_cover"), label="Back cover", allow_unmaterialized=True
+        _required_mapping(payload, "back_cover"),
+        label="Back cover",
+        asset_root=asset_root,
+        allow_unmaterialized=True,
     )
 
     activation = str(payload.get("activation") or "")
