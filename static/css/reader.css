@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Allura";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("https://cdn.jsdelivr.net/fontsource/fonts/allura@5.3.0/latin-400-normal.woff2") format("woff2");
+}
+
 :root {
   color-scheme: dark;
   --surround: #191816;
@@ -7,6 +15,7 @@
   --muted: rgba(247, 241, 229, 0.62);
   --page-radius: 1px;
   --turn-duration: 260ms;
+  --publication-serif: "EB Garamond", Garamond, Georgia, "Times New Roman", serif;
 }
 
 * { box-sizing: border-box; }
@@ -65,9 +74,10 @@ body {
   aspect-ratio: 2 / 3;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 22% 18%, rgba(255,255,255,.42), transparent 36%),
-    radial-gradient(ellipse at 78% 72%, rgba(132,111,77,.045), transparent 40%),
-    repeating-linear-gradient(17deg, rgba(93,76,47,.015) 0 1px, transparent 1px 5px),
+    radial-gradient(ellipse at 19% 16%, rgba(255,255,255,.34), transparent 38%),
+    radial-gradient(ellipse at 78% 73%, rgba(128,105,70,.035), transparent 44%),
+    linear-gradient(103deg, rgba(91,71,43,.012), transparent 23%, rgba(255,255,255,.045) 52%, transparent 78%),
+    linear-gradient(12deg, rgba(111,92,60,.012), transparent 39%, rgba(255,255,255,.028) 71%, transparent),
     var(--paper);
   border-radius: var(--page-radius);
   box-shadow: 0 16px 38px rgba(0,0,0,.28), 0 2px 5px rgba(0,0,0,.22);
@@ -88,11 +98,37 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 3;
-  opacity: .13;
+  opacity: .09;
   background:
-    repeating-radial-gradient(circle at 17% 13%, rgba(82,63,37,.09) 0 .38px, transparent .45px 3.6px),
-    repeating-linear-gradient(91deg, rgba(255,255,255,.16) 0 1px, transparent 1px 9px);
+    radial-gradient(circle at 13% 9%, rgba(80,62,37,.15) 0 .5px, transparent .7px),
+    radial-gradient(circle at 67% 24%, rgba(80,62,37,.11) 0 .45px, transparent .65px),
+    radial-gradient(circle at 34% 71%, rgba(80,62,37,.1) 0 .5px, transparent .7px),
+    radial-gradient(circle at 88% 83%, rgba(80,62,37,.08) 0 .45px, transparent .65px);
   mix-blend-mode: multiply;
+}
+
+.page-cover {
+  background: #efece5;
+  box-shadow: 0 20px 42px rgba(0,0,0,.38), 5px 3px 0 rgba(239,234,222,.16), 8px 5px 12px rgba(0,0,0,.18);
+}
+
+.page-cover::after { display: none; }
+
+.book-stage.is-cover-state .page-cover {
+  border-radius: 2px 4px 4px 2px;
+}
+
+.cover-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  z-index: 2;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .page-canvas,
@@ -128,7 +164,98 @@ body {
   transform-origin: 0% 0%;
 }
 
-.text-layer ::selection { background: rgba(104, 124, 166, .32); }
+.text-layer ::selection,
+.front-matter-content ::selection { background: rgba(104, 124, 166, .32); }
+
+.front-matter-content {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  color: var(--ink);
+  font-family: var(--publication-serif);
+  user-select: text;
+}
+
+.title-page {
+  display: grid;
+  place-items: center;
+  padding: 13% 12% 24%;
+  text-align: center;
+}
+
+.title-page h1 {
+  margin: 0;
+  max-width: 88%;
+  font-size: clamp(1.35rem, 3.4vmin, 2.7rem);
+  font-weight: 500;
+  line-height: 1.13;
+  letter-spacing: .015em;
+  text-wrap: balance;
+}
+
+.dedication-page {
+  display: grid;
+  place-items: center;
+  padding: 18% 13%;
+  text-align: center;
+}
+
+.dedication-page p {
+  margin: 0;
+  max-width: 88%;
+  font-size: clamp(1rem, 2.4vmin, 1.85rem);
+  line-height: 1.5;
+}
+
+.dedication-page .script-dedication {
+  font-family: "Allura", "Snell Roundhand", "Segoe Script", cursive;
+  font-size: clamp(1.45rem, 3.7vmin, 2.7rem);
+  line-height: 1.36;
+  letter-spacing: .006em;
+}
+
+.index-page {
+  display: flex;
+  flex-direction: column;
+  padding: 12% 11% 9%;
+}
+
+.index-page h2 {
+  margin: 0 0 8%;
+  text-align: center;
+  font-size: clamp(1.15rem, 2.65vmin, 2rem);
+  font-weight: 500;
+  letter-spacing: .035em;
+}
+
+.index-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: clamp(4px, .65vmin, 8px);
+  font-size: clamp(.57rem, 1.25vmin, .88rem);
+  line-height: 1.22;
+}
+
+.index-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: .8em;
+}
+
+.index-list li span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.index-list li span:last-child {
+  min-width: 2.2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 .page-loading {
   position: absolute;
@@ -170,7 +297,7 @@ body {
 }
 
 .source-info { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.position { justify-self: center; white-space: nowrap; }
+.position { justify-self: center; white-space: nowrap; min-height: 1em; }
 .controls { justify-self: end; display: flex; gap: 4px; }
 
 .page-button {
@@ -207,6 +334,7 @@ body {
   .source-info { display: none; }
   .reader-meta { grid-template-columns: 1fr auto; }
   .position { justify-self: start; }
+  .index-page { padding-inline: 10%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
