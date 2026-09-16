@@ -26,3 +26,19 @@ test('single-page turn advances exactly one page', () => {
 test('spread anchor preserves the current semantic page pair', () => {
   assert.equal(normalizeAnchor(3, 'spread', 105), 2);
 });
+
+test('wide landscape phone remains single-page when two pages would be cramped', () => {
+  assert.equal(modeForViewport(844, 390), 'single');
+});
+
+test('portrait tablet remains single-page', () => {
+  assert.equal(modeForViewport(820, 1180), 'single');
+});
+
+test('landscape tablet can use a two-page spread', () => {
+  assert.equal(modeForViewport(1180, 820), 'spread');
+});
+
+test('constrained browser window remains single-page', () => {
+  assert.equal(modeForViewport(850, 700), 'single');
+});
