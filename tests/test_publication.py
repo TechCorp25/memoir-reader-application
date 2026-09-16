@@ -29,7 +29,7 @@ CHAPTERS = (
     Chapter("02", "TWO", "chapters/02.md", 2, "02_TWO.pdf"),
 )
 SNAPSHOT = Snapshot("techcorp-DevApps/memoir", "a" * 40, 5, CHAPTERS)
-DEDICATION = ApprovedDedication("Exact approved words", "author:test", True)
+DEDICATION = ApprovedDedication("Exact approved words", "author:test", True, "script")
 
 
 def ready_authority() -> FrontMatterAuthority:
@@ -39,6 +39,7 @@ def ready_authority() -> FrontMatterAuthority:
         "b" * 64,
         "image/jpeg",
         True,
+        "publication/assets/front-cover.jpeg",
     )
     back = ApprovedCover(
         "back-cover-approved",
@@ -46,6 +47,7 @@ def ready_authority() -> FrontMatterAuthority:
         "c" * 64,
         "image/jpeg",
         True,
+        "publication/assets/back-cover.jpeg",
     )
     return FrontMatterAuthority(
         canonical_repository="techcorp-DevApps/memoir",
@@ -62,6 +64,8 @@ def ready_authority() -> FrontMatterAuthority:
 
 def test_payload_preserves_manuscript_pagination_inside_physical_sequence():
     payload = build_publication_payload(SNAPSHOT, ready_authority())
+    assert payload["book_title"] == "The Long Road To Nowhere"
+    assert payload["dedication_presentation"] == "script"
     assert payload["manuscript_total_pages"] == 5
     assert payload["front_matter_pages"] == 8
     assert payload["physical_total_pages"] == 13
@@ -77,6 +81,17 @@ def test_payload_index_uses_logical_manuscript_folios():
         {"order": "01", "title": "ONE", "manuscript_page": 1},
         {"order": "02", "title": "TWO", "manuscript_page": 4},
     ]
+
+
+def test_payload_exposes_only_verified_materialized_asset_urls():
+    payload = build_publication_payload(SNAPSHOT, ready_authority())
+    assert payload["assets"]["front-cover-approved"] == {
+        "asset_id": "front-cover-approved",
+        "url": "/api/front-matter-asset/front-cover-approved",
+        "mime_type": "image/jpeg",
+        "sha256": "b" * 64,
+    }
+    assert payload["assets"]["back-cover-approved"]["url"] == "/api/front-matter-asset/back-cover-approved"
 
 
 def test_payload_is_fail_closed_while_front_cover_bytes_are_not_materialized():
