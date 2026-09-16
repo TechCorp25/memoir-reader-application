@@ -32,7 +32,7 @@ def create_app():
             "Content-Security-Policy",
             "default-src 'self'; img-src 'self' data:; style-src 'self'; "
             "script-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; "
-            "connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' data:; "
+            "connect-src 'self' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; "
             "frame-ancestors 'none'; base-uri 'self'",
         )
         return response
