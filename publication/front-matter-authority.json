@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "canonical_repository": "techcorp-DevApps/memoir",
+  "canonical_precedence": true,
+  "book_title": {
+    "value": "The Long Road To Nowhere",
+    "approval_status": "AUTHOR_APPROVED",
+    "authority": "canonical:planning/decision-ledger_2026-08-30.md#B28"
+  },
+  "dedication": {
+    "value": "For anyone who's ever felt lost, questioned the path being travelled or wondered if it's to late to start again",
+    "presentation": "script",
+    "approval_status": "AUTHOR_APPROVED",
+    "authority": "author-directive:2026-09-12"
+  },
+  "cover": {
+    "approval_status": "BLOCKED_MISSING_APPROVED_ASSET",
+    "asset_id": null,
+    "asset_path": null,
+    "sha256": null,
+    "mime_type": null,
+    "authority": "not-established"
+  },
+  "sequence": [
+    "cover",
+    "blank",
+    "title",
+    "blank",
+    "dedication",
+    "blank",
+    "index",
+    "blank",
+    "manuscript"
+  ],
+  "activation": "FAIL_CLOSED_UNTIL_COVER_APPROVED"
+}
