@@ -9,7 +9,7 @@ const OUTPUT_DIR = process.env.VISUAL_QA_OUTPUT || 'artifacts/visual-qa';
 
 const viewports = [
   { name: 'phone-portrait', width: 390, height: 844, spread: false },
-  { name: 'phone-landscape', width: 844, height: 390, spread: false },
+  { name: 'phone-landscape', width: 844, height: 390, spread: true },
   { name: 'tablet-portrait', width: 820, height: 1180, spread: false },
   { name: 'tablet-landscape', width: 1180, height: 820, spread: true },
   { name: 'desktop-landscape', width: 1366, height: 768, spread: true },
