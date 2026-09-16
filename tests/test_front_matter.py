@@ -5,14 +5,12 @@ from pathlib import Path
 import pytest
 
 from memoir_reader.assembly import PublicationAssemblyError
-from memoir_reader.front_matter import (
-    APPROVED_NOT_MATERIALIZED,
-    REQUIRED_SEQUENCE,
-    load_front_matter_authority,
-)
+from memoir_reader.front_matter import REQUIRED_SEQUENCE, load_front_matter_authority
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = REPO_ROOT / "publication" / "front-matter-authority.json"
+FRONT_COVER_PATH = REPO_ROOT / "publication" / "assets" / "33669713-CC6F-48A1-A36D-E6D04200014A.png"
+FRONT_COVER_SHA256 = "adedcf87e5b38be7c3e15048967a3dc70a8a1521ad4f5d35f6bb1939dd7cb34c"
 BACK_COVER_PATH = REPO_ROOT / "publication" / "assets" / "back-cover.jpeg"
 BACK_COVER_SHA256 = "6b59c5d29bf561660210cfda6890e590a1bf48a34a37983a32135c876122cfb1"
 
@@ -27,13 +25,20 @@ def test_controlled_authority_records_exact_required_sequence_and_approved_dedic
     assert authority.dedication.presentation == "script"
 
 
-def test_front_cover_authority_is_approved_but_remains_fail_closed_until_bytes_are_materialized():
+def test_front_cover_is_author_approved_materialized_and_exactly_sha_bound():
     authority = load_front_matter_authority(AUTHORITY_PATH)
-    assert authority.cover_status == APPROVED_NOT_MATERIALIZED
-    assert authority.cover is None
-    assert authority.ready is False
-    with pytest.raises(PublicationAssemblyError, match="AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED"):
-        authority.require_ready()
+    assert authority.cover_status == "AUTHOR_APPROVED"
+    assert authority.cover is not None
+    assert authority.ready is True
+    assert authority.cover.asset_path == "publication/assets/33669713-CC6F-48A1-A36D-E6D04200014A.png"
+    assert authority.cover.mime_type == "image/png"
+    assert authority.cover.sha256 == FRONT_COVER_SHA256
+    assert hashlib.sha256(FRONT_COVER_PATH.read_bytes()).hexdigest() == FRONT_COVER_SHA256
+    payload = json.loads(AUTHORITY_PATH.read_text(encoding="utf-8"))
+    assert payload["cover"]["pixel_width"] == 1024
+    assert payload["cover"]["pixel_height"] == 1536
+    assert payload["cover"]["source_filename"] == "33669713-CC6F-48A1-A36D-E6D04200014A.png"
+    authority.require_ready()
 
 
 def test_back_cover_is_author_approved_materialized_and_exactly_sha_bound():

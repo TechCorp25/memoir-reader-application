@@ -14,13 +14,15 @@
     "authority": "author-directive:2026-09-12"
   },
   "cover": {
-    "approval_status": "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED",
+    "approval_status": "AUTHOR_APPROVED",
     "asset_id": "front-cover-approved",
-    "asset_path": "publication/assets/front-cover.jpeg",
-    "sha256": "c414bfe31fa46a5fa9d31c7d43a8fa6c4abe0e0713c4866e979bc5fdef5d36ed",
-    "mime_type": "image/jpeg",
-    "source_filename": "the-long-road-to-nowhere-front-cover.jpeg",
-    "authority": "author-directive:2026-09-16T18:16+10:00; byte-preserved-front-cover-source; exact-byte-identity-recorded:2026-09-16"
+    "asset_path": "publication/assets/33669713-CC6F-48A1-A36D-E6D04200014A.png",
+    "sha256": "adedcf87e5b38be7c3e15048967a3dc70a8a1521ad4f5d35f6bb1939dd7cb34c",
+    "mime_type": "image/png",
+    "pixel_width": 1024,
+    "pixel_height": 1536,
+    "source_filename": "33669713-CC6F-48A1-A36D-E6D04200014A.png",
+    "authority": "author-directive:2026-09-16; repository-upload-confirmed; byte-verified-by-github-actions:2026-09-16"
   },
   "back_cover": {
     "approval_status": "AUTHOR_APPROVED",
