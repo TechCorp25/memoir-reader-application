@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from .assembly import PhysicalPage, build_index, assemble_publication
+from .assembly import ApprovedCover, PhysicalPage, build_index, assemble_publication
 from .front_matter import FrontMatterAuthority
 
 
@@ -14,6 +14,15 @@ class SnapshotLike(Protocol):
 
 
 FRONT_MATTER_PAGE_COUNT = 8
+
+
+def _asset_payload(asset: ApprovedCover) -> dict[str, str]:
+    return {
+        "asset_id": asset.asset_id,
+        "url": f"/api/front-matter-asset/{asset.asset_id}",
+        "mime_type": asset.mime_type,
+        "sha256": asset.sha256,
+    }
 
 
 def build_publication_payload(snapshot: SnapshotLike, authority: FrontMatterAuthority) -> dict[str, Any]:
@@ -37,14 +46,21 @@ def build_publication_payload(snapshot: SnapshotLike, authority: FrontMatterAuth
     if len(pages) != FRONT_MATTER_PAGE_COUNT + snapshot.total_pages:
         raise ValueError("Physical publication page count failed integrity validation")
 
+    assets = {authority.cover.asset_id: _asset_payload(authority.cover)}
+    if authority.back_cover_ready and authority.back_cover is not None:
+        assets[authority.back_cover.asset_id] = _asset_payload(authority.back_cover)
+
     return {
         "repository": snapshot.repository,
         "commit_sha": snapshot.commit_sha,
+        "book_title": authority.book_title,
+        "dedication_presentation": authority.dedication.presentation,
         "manuscript_total_pages": snapshot.total_pages,
         "front_matter_pages": FRONT_MATTER_PAGE_COUNT,
         "physical_total_pages": len(pages),
         "index": [entry.as_dict() for entry in build_index(snapshot.chapters)],
         "pages": [page.as_dict() for page in pages],
+        "assets": assets,
         "cover_asset_id": authority.cover.asset_id,
         "back_cover": {
             "approval_status": authority.back_cover_status,

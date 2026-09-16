@@ -54,6 +54,12 @@ class FrontMatterAuthority:
         if not self.ready:
             raise PublicationAssemblyError(f"Front matter is not publication-ready: {self.cover_status}")
 
+    def approved_asset(self, asset_id: str) -> ApprovedCover:
+        for asset in (self.cover, self.back_cover):
+            if asset is not None and asset.approved and asset.asset_id == asset_id:
+                return asset
+        raise PublicationAssemblyError("Requested front-matter asset is not publication-approved and materialized")
+
 
 def _required_mapping(payload: dict[str, Any], key: str) -> dict[str, Any]:
     value = payload.get(key)
@@ -71,6 +77,16 @@ def _safe_asset_path(asset_root: Path, relative_path: str, label: str) -> Path:
     if resolved_asset != resolved_root and resolved_root not in resolved_asset.parents:
         raise PublicationAssemblyError(f"{label} asset path escapes the application root")
     return resolved_asset
+
+
+def resolve_approved_asset_path(
+    asset: ApprovedCover,
+    authority_path: Path | str = FRONT_MATTER_AUTHORITY_PATH,
+) -> Path:
+    if not asset.approved or not asset.asset_path:
+        raise PublicationAssemblyError("Approved asset path is unavailable")
+    root = Path(authority_path).resolve().parent.parent
+    return _safe_asset_path(root, asset.asset_path, "Front-matter asset")
 
 
 def _validate_image_bytes(payload: bytes, mime_type: str, label: str) -> None:
@@ -121,6 +137,7 @@ def _load_cover(
             sha256=sha256.lower(),
             mime_type=mime_type,
             approved=True,
+            asset_path=asset_path,
         )
     if allow_unmaterialized and status == APPROVED_NOT_MATERIALIZED:
         if not str(data.get("authority") or ""):

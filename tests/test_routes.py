@@ -45,6 +45,7 @@ def ready_authority():
         sha256="b" * 64,
         mime_type="image/jpeg",
         approved=True,
+        asset_path="publication/assets/front-cover.jpeg",
     )
     back = ApprovedCover(
         asset_id="back-cover-approved",
@@ -52,6 +53,7 @@ def ready_authority():
         sha256="c" * 64,
         mime_type="image/jpeg",
         approved=True,
+        asset_path="publication/assets/back-cover.jpeg",
     )
     return FrontMatterAuthority(
         canonical_repository="techcorp-DevApps/memoir",
@@ -77,6 +79,8 @@ def test_health_keeps_canonical_reader_healthy_while_physical_assembly_is_blocke
     assert payload["application_commit"] is None
     assert payload["publication_assembly"]["status"] == "blocked"
     assert payload["publication_assembly"]["front_cover"] == "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED"
+    assert payload["publication_assembly"]["front_cover_materialized"] is False
+    assert payload["publication_assembly"]["back_cover_materialized"] is False
 
 
 def test_health_exposes_render_application_commit_for_deployment_verification(monkeypatch):
@@ -110,6 +114,8 @@ def test_publication_endpoint_returns_commit_pinned_physical_model_when_ready(mo
     assert payload["pages"][0]["kind"] == "cover"
     assert payload["pages"][8]["kind"] == "manuscript"
     assert payload["pages"][8]["display_number"] == 1
+    assert payload["assets"]["front-cover-approved"]["url"] == "/api/front-matter-asset/front-cover-approved"
+    assert payload["assets"]["back-cover-approved"]["url"] == "/api/front-matter-asset/back-cover-approved"
     assert response.headers["X-Memoir-Commit"] == COMMIT
     assert response.headers["Cache-Control"] == "no-store"
 
@@ -119,3 +125,36 @@ def test_publication_endpoint_rejects_unverified_canonical_source():
     assert response.status_code == 503
     payload = response.get_json()
     assert payload["error"] == "canonical_source_unavailable"
+
+
+def test_front_matter_asset_route_rejects_unmaterialized_asset():
+    response = client_for(FakeSource()).get("/api/front-matter-asset/front-cover-approved")
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "front_matter_asset_unavailable"
+
+
+def test_front_matter_asset_route_serves_only_verified_asset(monkeypatch, tmp_path):
+    import memoir_reader.routes as routes
+
+    payload = b"\xff\xd8\xff\xe0verified-cover"
+    target = tmp_path / "front-cover.jpeg"
+    target.write_bytes(payload)
+    authority = ready_authority()
+    monkeypatch.setattr(routes, "load_front_matter_authority", lambda **kwargs: authority)
+    monkeypatch.setattr(routes, "resolve_approved_asset_path", lambda asset: target)
+
+    response = client_for(FakeSource()).get("/api/front-matter-asset/front-cover-approved")
+    assert response.status_code == 200
+    assert response.data == payload
+    assert response.mimetype == "image/jpeg"
+    assert response.headers["X-Asset-SHA256"] == "b" * 64
+    assert response.headers["Cache-Control"] == "public, max-age=31536000, immutable"
+
+
+def test_front_matter_asset_route_rejects_unknown_asset(monkeypatch):
+    import memoir_reader.routes as routes
+
+    monkeypatch.setattr(routes, "load_front_matter_authority", lambda **kwargs: ready_authority())
+    response = client_for(FakeSource()).get("/api/front-matter-asset/not-approved")
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "front_matter_asset_unavailable"

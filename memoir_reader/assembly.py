@@ -23,6 +23,7 @@ class ApprovedCover:
     sha256: str
     mime_type: str
     approved: bool
+    asset_path: str | None = None
 
 
 @dataclass(frozen=True)
