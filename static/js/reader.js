@@ -334,8 +334,9 @@ async function performTurn(direction) {
   if (next === state.anchor) return;
   state.turning = true;
   state.anchor = next;
-  await renderCurrent({ animate: true, direction });
+  const renderPromise = renderCurrent({ animate: true, direction });
   window.setTimeout(() => { state.turning = false; }, 280);
+  await renderPromise;
 }
 
 function selectionActive() {
