@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "canonical_repository": "techcorp-DevApps/memoir",
   "canonical_precedence": true,
   "book_title": {
@@ -14,12 +14,23 @@
     "authority": "author-directive:2026-09-12"
   },
   "cover": {
-    "approval_status": "BLOCKED_MISSING_APPROVED_ASSET",
-    "asset_id": null,
+    "approval_status": "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED",
+    "asset_id": "front-cover-approved",
     "asset_path": null,
     "sha256": null,
     "mime_type": null,
-    "authority": "not-established"
+    "authority": "author-directive:2026-09-16T18:16+10:00; previously-provided-front-cover-image"
+  },
+  "back_cover": {
+    "approval_status": "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED",
+    "asset_id": "back-cover-approved",
+    "asset_path": null,
+    "sha256": "6b59c5d29bf561660210cfda6890e590a1bf48a34a37983a32135c876122cfb1",
+    "mime_type": "image/jpeg",
+    "pixel_width": 1024,
+    "pixel_height": 1536,
+    "source_file_id": "file_0000000041ec820b896edee6effd01cd",
+    "authority": "author-directive:2026-09-16T18:16+10:00; uploaded-back-cover-image"
   },
   "sequence": [
     "cover",
@@ -32,5 +43,5 @@
     "blank",
     "manuscript"
   ],
-  "activation": "FAIL_CLOSED_UNTIL_COVER_APPROVED"
+  "activation": "FAIL_CLOSED_UNTIL_FRONT_COVER_MATERIALIZED"
 }
