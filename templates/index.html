@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=yes">
+  <meta name="theme-color" content="#191816">
+  <title>The Long Road To Nowhere</title>
+  <link rel="stylesheet" href="/static/css/reader.css">
+</head>
+<body>
+  <main class="reader" aria-label="Memoir reader">
+    <section class="reader-surface">
+      <div class="book-stage" data-book-stage aria-live="polite"></div>
+      <div class="status" data-status role="status">Opening the book…</div>
+    </section>
+    <div class="reader-meta" aria-label="Reading position">
+      <div class="source-info" data-source-info></div>
+      <div class="position" data-position></div>
+      <nav class="controls" aria-label="Page navigation">
+        <button class="page-button" type="button" data-previous aria-label="Previous page">‹</button>
+        <button class="page-button" type="button" data-next aria-label="Next page">›</button>
+      </nav>
+    </div>
+  </main>
+  <script type="module" src="/static/js/reader.js"></script>
+</body>
+</html>
