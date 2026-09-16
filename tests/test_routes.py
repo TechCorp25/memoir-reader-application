@@ -1,0 +1,111 @@
+from memoir_reader import create_app
+from memoir_reader.assembly import ApprovedCover, ApprovedDedication
+from memoir_reader.front_matter import FrontMatterAuthority, REQUIRED_SEQUENCE
+from memoir_reader.source import ApprovedChapter, BookSnapshot, SourceError
+
+
+COMMIT = "a" * 40
+CHAPTERS = (
+    ApprovedChapter("01", "ONE", "chapters/01.md", 3, "01_ONE.pdf"),
+    ApprovedChapter("02", "TWO", "chapters/02.md", 2, "02_TWO.pdf"),
+)
+SNAPSHOT = BookSnapshot(
+    repository="techcorp-DevApps/memoir",
+    requested_ref="main",
+    commit_sha=COMMIT,
+    manifest_base_commit=None,
+    total_pages=5,
+    chapters=CHAPTERS,
+    generated_at_unix=0,
+)
+
+
+class FakeSource:
+    def __init__(self, snapshot=SNAPSHOT, error=None):
+        self._snapshot = snapshot
+        self._error = error
+
+    def snapshot(self):
+        if self._error:
+            raise self._error
+        return self._snapshot
+
+
+def client_for(fake_source):
+    app = create_app()
+    app.config.update(TESTING=True)
+    app.extensions["book_source"] = fake_source
+    return app.test_client()
+
+
+def ready_authority():
+    front = ApprovedCover(
+        asset_id="front-cover-approved",
+        source="author:test:publication/assets/front-cover.jpeg",
+        sha256="b" * 64,
+        mime_type="image/jpeg",
+        approved=True,
+    )
+    back = ApprovedCover(
+        asset_id="back-cover-approved",
+        source="author:test:publication/assets/back-cover.jpeg",
+        sha256="c" * 64,
+        mime_type="image/jpeg",
+        approved=True,
+    )
+    return FrontMatterAuthority(
+        canonical_repository="techcorp-DevApps/memoir",
+        book_title="The Long Road To Nowhere",
+        dedication=ApprovedDedication("Exact approved words", "author:test", True),
+        cover_status="AUTHOR_APPROVED",
+        cover=front,
+        back_cover_status="AUTHOR_APPROVED",
+        back_cover=back,
+        sequence=REQUIRED_SEQUENCE,
+        activation="FAIL_CLOSED_UNTIL_FRONT_COVER_MATERIALIZED",
+    )
+
+
+def test_health_keeps_canonical_reader_healthy_while_physical_assembly_is_blocked():
+    response = client_for(FakeSource()).get("/health")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["canonical_source"] == "techcorp-DevApps/memoir"
+    assert payload["commit_sha"] == COMMIT
+    assert payload["publication_assembly"]["status"] == "blocked"
+    assert payload["publication_assembly"]["front_cover"] == "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED"
+
+
+def test_publication_endpoint_fails_closed_until_exact_front_cover_is_materialized():
+    response = client_for(FakeSource()).get("/api/publication")
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error"] == "publication_assembly_unavailable"
+    assert payload["commit_sha"] == COMMIT
+    assert "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED" in payload["message"]
+
+
+def test_publication_endpoint_returns_commit_pinned_physical_model_when_ready(monkeypatch):
+    import memoir_reader.routes as routes
+
+    monkeypatch.setattr(routes, "load_front_matter_authority", lambda **kwargs: ready_authority())
+    response = client_for(FakeSource()).get("/api/publication")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["commit_sha"] == COMMIT
+    assert payload["manuscript_total_pages"] == 5
+    assert payload["front_matter_pages"] == 8
+    assert payload["physical_total_pages"] == 13
+    assert payload["pages"][0]["kind"] == "cover"
+    assert payload["pages"][8]["kind"] == "manuscript"
+    assert payload["pages"][8]["display_number"] == 1
+    assert response.headers["X-Memoir-Commit"] == COMMIT
+    assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_publication_endpoint_rejects_unverified_canonical_source():
+    response = client_for(FakeSource(error=SourceError("canonical unavailable"))).get("/api/publication")
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error"] == "canonical_source_unavailable"
