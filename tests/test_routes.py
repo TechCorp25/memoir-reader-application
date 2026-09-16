@@ -5,6 +5,7 @@ from memoir_reader.source import ApprovedChapter, BookSnapshot, SourceError
 
 
 COMMIT = "a" * 40
+FRONT_COVER_SHA256 = "adedcf87e5b38be7c3e15048967a3dc70a8a1521ad4f5d35f6bb1939dd7cb34c"
 BACK_COVER_SHA256 = "6b59c5d29bf561660210cfda6890e590a1bf48a34a37983a32135c876122cfb1"
 CHAPTERS = (
     ApprovedChapter("01", "ONE", "chapters/01.md", 3, "01_ONE.pdf"),
@@ -69,7 +70,22 @@ def ready_authority():
     )
 
 
-def test_health_keeps_canonical_reader_healthy_while_physical_assembly_is_blocked(monkeypatch):
+def blocked_authority():
+    ready = ready_authority()
+    return FrontMatterAuthority(
+        canonical_repository=ready.canonical_repository,
+        book_title=ready.book_title,
+        dedication=ready.dedication,
+        cover_status="AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED",
+        cover=None,
+        back_cover_status=ready.back_cover_status,
+        back_cover=ready.back_cover,
+        sequence=ready.sequence,
+        activation=ready.activation,
+    )
+
+
+def test_health_reports_physical_publication_ready_when_covers_are_materialized(monkeypatch):
     monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
     response = client_for(FakeSource()).get("/health")
     assert response.status_code == 200
@@ -78,9 +94,9 @@ def test_health_keeps_canonical_reader_healthy_while_physical_assembly_is_blocke
     assert payload["canonical_source"] == "techcorp-DevApps/memoir"
     assert payload["commit_sha"] == COMMIT
     assert payload["application_commit"] is None
-    assert payload["publication_assembly"]["status"] == "blocked"
-    assert payload["publication_assembly"]["front_cover"] == "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED"
-    assert payload["publication_assembly"]["front_cover_materialized"] is False
+    assert payload["publication_assembly"]["status"] == "ready"
+    assert payload["publication_assembly"]["front_cover"] == "AUTHOR_APPROVED"
+    assert payload["publication_assembly"]["front_cover_materialized"] is True
     assert payload["publication_assembly"]["back_cover"] == "AUTHOR_APPROVED"
     assert payload["publication_assembly"]["back_cover_materialized"] is True
 
@@ -93,7 +109,10 @@ def test_health_exposes_render_application_commit_for_deployment_verification(mo
     assert response.get_json()["application_commit"] == application_commit
 
 
-def test_publication_endpoint_fails_closed_until_exact_front_cover_is_materialized():
+def test_publication_endpoint_remains_fail_closed_if_front_cover_authority_is_unmaterialized(monkeypatch):
+    import memoir_reader.routes as routes
+
+    monkeypatch.setattr(routes, "load_front_matter_authority", lambda **kwargs: blocked_authority())
     response = client_for(FakeSource()).get("/api/publication")
     assert response.status_code == 503
     payload = response.get_json()
@@ -129,10 +148,13 @@ def test_publication_endpoint_rejects_unverified_canonical_source():
     assert payload["error"] == "canonical_source_unavailable"
 
 
-def test_front_matter_asset_route_rejects_unmaterialized_front_cover():
+def test_materialized_front_cover_route_is_available_and_sha_bound():
     response = client_for(FakeSource()).get("/api/front-matter-asset/front-cover-approved")
-    assert response.status_code == 404
-    assert response.get_json()["error"] == "front_matter_asset_unavailable"
+    assert response.status_code == 200
+    assert response.mimetype == "image/png"
+    assert response.data.startswith(b"\x89PNG\r\n\x1a\n")
+    assert response.headers["X-Asset-SHA256"] == FRONT_COVER_SHA256
+    assert response.headers["Cache-Control"] == "public, max-age=31536000, immutable"
 
 
 def test_materialized_back_cover_route_is_available_and_sha_bound():
