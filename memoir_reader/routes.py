@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 from flask import Blueprint, current_app, jsonify, render_template, request, send_file
 
 from .assembly import PublicationAssemblyError
@@ -43,6 +44,7 @@ def health():
             "status": "ok",
             "canonical_source": snapshot.repository,
             "commit_sha": snapshot.commit_sha,
+            "application_commit": os.getenv("RENDER_GIT_COMMIT"),
             "approved_chapters": len(snapshot.chapters),
             "pages": snapshot.total_pages,
             "publication_assembly": publication_assembly,
