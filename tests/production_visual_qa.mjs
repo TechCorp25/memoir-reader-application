@@ -82,14 +82,20 @@ async function assertTitlePage(page, name) {
     return {
       text: node.textContent,
       fontFamily: style.fontFamily,
+      fontWeight: style.fontWeight,
+      textTransform: style.textTransform,
       whiteSpace: style.whiteSpace,
       lineRects: range.getClientRects().length,
       scrollWidth: node.scrollWidth,
       clientWidth: node.clientWidth,
+      fontLoaded: document.fonts.check('600 16px "Roboto Condensed"'),
     };
   });
-  assert.equal(typography.text, 'The Long Road To Nowhere', `${name}: title wording changed`);
-  assert.match(typography.fontFamily, /EB Garamond/i, `${name}: title page is not using EB Garamond`);
+  assert.equal(typography.text, 'The Long Road To Nowhere', `${name}: title authority text changed`);
+  assert.match(typography.fontFamily, /Roboto Condensed/i, `${name}: title page is not using the cover-style condensed face`);
+  assert.equal(typography.fontLoaded, true, `${name}: cover-style title font did not load`);
+  assert.equal(typography.fontWeight, '600', `${name}: cover-style title weight changed`);
+  assert.equal(typography.textTransform, 'uppercase', `${name}: title page must mirror the cover's uppercase treatment`);
   assert.equal(typography.whiteSpace, 'nowrap', `${name}: title page must prohibit wrapping`);
   assert.equal(typography.lineRects, 1, `${name}: title page must render on exactly one line`);
   assert.ok(typography.scrollWidth <= typography.clientWidth + 1, `${name}: one-line title overflows its box`);
