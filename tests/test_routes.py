@@ -5,6 +5,7 @@ from memoir_reader.source import ApprovedChapter, BookSnapshot, SourceError
 
 
 COMMIT = "a" * 40
+BACK_COVER_SHA256 = "6b59c5d29bf561660210cfda6890e590a1bf48a34a37983a32135c876122cfb1"
 CHAPTERS = (
     ApprovedChapter("01", "ONE", "chapters/01.md", 3, "01_ONE.pdf"),
     ApprovedChapter("02", "TWO", "chapters/02.md", 2, "02_TWO.pdf"),
@@ -80,7 +81,8 @@ def test_health_keeps_canonical_reader_healthy_while_physical_assembly_is_blocke
     assert payload["publication_assembly"]["status"] == "blocked"
     assert payload["publication_assembly"]["front_cover"] == "AUTHOR_APPROVED_ASSET_NOT_MATERIALIZED"
     assert payload["publication_assembly"]["front_cover_materialized"] is False
-    assert payload["publication_assembly"]["back_cover_materialized"] is False
+    assert payload["publication_assembly"]["back_cover"] == "AUTHOR_APPROVED"
+    assert payload["publication_assembly"]["back_cover_materialized"] is True
 
 
 def test_health_exposes_render_application_commit_for_deployment_verification(monkeypatch):
@@ -127,10 +129,19 @@ def test_publication_endpoint_rejects_unverified_canonical_source():
     assert payload["error"] == "canonical_source_unavailable"
 
 
-def test_front_matter_asset_route_rejects_unmaterialized_asset():
+def test_front_matter_asset_route_rejects_unmaterialized_front_cover():
     response = client_for(FakeSource()).get("/api/front-matter-asset/front-cover-approved")
     assert response.status_code == 404
     assert response.get_json()["error"] == "front_matter_asset_unavailable"
+
+
+def test_materialized_back_cover_route_is_available_and_sha_bound():
+    response = client_for(FakeSource()).get("/api/front-matter-asset/back-cover-approved")
+    assert response.status_code == 200
+    assert response.mimetype == "image/jpeg"
+    assert response.data.startswith(b"\xff\xd8\xff")
+    assert response.headers["X-Asset-SHA256"] == BACK_COVER_SHA256
+    assert response.headers["Cache-Control"] == "public, max-age=31536000, immutable"
 
 
 def test_front_matter_asset_route_serves_only_verified_asset(monkeypatch, tmp_path):
