@@ -10,6 +10,12 @@ MANIFEST = """# Publication Formatting Manifest
 | 03 | APPROVED TWO | `chapters/03.md` | 2 | PASS | PASS | PASS; font=PASS | PASS_100_PERCENT | |
 """
 
+CSV_MANIFEST = """order,title,source_path,source_blob_sha,approval_status,docx_output,pdf_output,page_count,docx_text_compare,pdf_text_compare,render_preflight,visual_qa,concern,sync_status
+01,APPROVED,chapters/01.md,abc,CURRENT_REPOSITORY_SOURCE,publication/chapters/01_APPROVED.docx,publication/chapters/01_APPROVED.pdf,3,PASS,PASS,PASS; font=PASS,PASS_100_PERCENT,,branch-generated-verified
+02,BLOCKED,chapters/02.md,def,BLOCKED_SOURCE_CONFLICT,,,,NOT_RUN,NOT_RUN,NOT_RUN,NOT_RUN,blocked,blocked
+03,APPROVED TWO,chapters/03.md,ghi,CURRENT_REPOSITORY_SOURCE,publication/chapters/03_APPROVED_TWO.docx,publication/chapters/03_APPROVED_TWO.pdf,2,PASS,PASS,PASS; font=PASS,PASS_100_PERCENT,,branch-generated-verified
+"""
+
 
 def test_approved_rows_only_include_qa_passed_publication_files():
     files = ["01_APPROVED.pdf", "02_BLOCKED.pdf", "03_APPROVED_TWO.pdf"]
@@ -18,15 +24,27 @@ def test_approved_rows_only_include_qa_passed_publication_files():
     assert sum(chapter.pages for chapter in chapters) == 5
 
 
+def test_csv_manifest_drives_approved_pdf_paths_without_directory_listing():
+    chapters = CanonicalBookSource._approved_rows_csv(CSV_MANIFEST)
+    assert [chapter.pdf_file for chapter in chapters] == ["01_APPROVED.pdf", "03_APPROVED_TWO.pdf"]
+    assert sum(chapter.pages for chapter in chapters) == 5
+
+
 def test_manifest_base_commit_is_captured():
     assert CanonicalBookSource._extract_manifest_base_commit(MANIFEST) == "abcdef1234567890"
 
 
-def test_missing_pdf_for_approved_row_is_hard_failure():
+def test_git_advertisement_resolves_requested_branch_sha():
+    sha = "a" * 40
+    payload = f"001e# service=git-upload-pack\n0000{sha} refs/heads/main\n".encode()
+    assert CanonicalBookSource._commit_from_git_advertisement(payload, "main") == sha
+
+
+def test_git_advertisement_rejects_missing_branch():
     try:
-        CanonicalBookSource._approved_rows(MANIFEST, ["01_APPROVED.pdf"])
+        CanonicalBookSource._commit_from_git_advertisement(b"0000", "main")
     except SourceError as exc:
-        assert "order 03" in str(exc)
+        assert "commit identity" in str(exc)
     else:
         raise AssertionError("expected SourceError")
 
