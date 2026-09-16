@@ -32,6 +32,11 @@ class ApprovedDedication:
     source: str
     approved: bool
     presentation: str = "script"
+    asset_id: str | None = None
+    asset_path: str | None = None
+    mime_type: str | None = None
+    sha256: str | None = None
+    git_blob_sha: str | None = None
 
 
 @dataclass(frozen=True)
@@ -113,6 +118,19 @@ def _validate_dedication(dedication: ApprovedDedication) -> None:
         raise PublicationAssemblyError("Dedication is not publication-approved")
     if not dedication.content or not dedication.source:
         raise PublicationAssemblyError("Dedication approval provenance is incomplete")
+    if dedication.presentation == "image":
+        if not all(
+            (
+                dedication.asset_id,
+                dedication.asset_path,
+                dedication.mime_type,
+                dedication.sha256,
+                dedication.git_blob_sha,
+            )
+        ):
+            raise PublicationAssemblyError("Dedication image approval provenance is incomplete")
+        if not dedication.mime_type.startswith("image/"):
+            raise PublicationAssemblyError("Approved dedication must be an image asset")
 
 
 def assemble_publication(
@@ -143,7 +161,7 @@ def assemble_publication(
         ("blank", "front-matter:blank-1", None, None),
         ("title", "front-matter:title", book_title, None),
         ("blank", "front-matter:blank-2", None, None),
-        ("dedication", "front-matter:dedication", dedication.content, None),
+        ("dedication", "front-matter:dedication", dedication.content, dedication.asset_id),
         ("blank", "front-matter:blank-3", None, None),
         ("index", "front-matter:index", index_text, None),
         ("blank", "front-matter:blank-4", None, None),
