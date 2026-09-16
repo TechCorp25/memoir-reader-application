@@ -5,6 +5,6 @@
   "version": "0.1.0",
   "description": "Publication-fidelity digital reader for The Long Road To Nowhere",
   "scripts": {
-    "test": "node --check static/js/navigation.js && node --check static/js/reader.js && node --test tests/*.test.mjs"
+    "test": "node --check static/js/navigation.js && node --check static/js/reader.js && node --check tests/production_visual_qa.mjs && node --test tests/*.test.mjs"
   }
 }
