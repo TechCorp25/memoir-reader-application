@@ -5,7 +5,7 @@ import os
 from flask import Blueprint, current_app, jsonify, render_template, request, send_file
 
 from .assembly import PublicationAssemblyError
-from .front_matter import load_front_matter_authority
+from .front_matter import load_front_matter_authority, resolve_approved_asset_path
 from .publication import build_publication_payload
 from .source import SourceError
 
@@ -34,7 +34,9 @@ def health():
         publication_assembly = {
             "status": "ready" if authority.ready else "blocked",
             "front_cover": authority.cover_status,
+            "front_cover_materialized": authority.ready,
             "back_cover": authority.back_cover_status,
+            "back_cover_materialized": authority.back_cover_ready,
         }
     except PublicationAssemblyError as exc:
         publication_assembly = {"status": "invalid", "error": str(exc)}
@@ -92,6 +94,35 @@ def publication_manifest():
     response = jsonify(payload)
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Memoir-Commit"] = snapshot.commit_sha
+    return response
+
+
+@bp.get("/api/front-matter-asset/<asset_id>")
+def front_matter_asset(asset_id: str):
+    """Serve only exact, SHA-verified, author-approved application-side assets."""
+
+    try:
+        snapshot = source().snapshot()
+    except SourceError as exc:
+        return jsonify({"error": "canonical_source_unavailable", "message": str(exc)}), 503
+
+    try:
+        authority = load_front_matter_authority(expected_canonical_repository=snapshot.repository)
+        asset = authority.approved_asset(asset_id)
+        asset_path = resolve_approved_asset_path(asset)
+    except PublicationAssemblyError as exc:
+        return jsonify({"error": "front_matter_asset_unavailable", "message": str(exc)}), 404
+
+    response = send_file(
+        asset_path,
+        mimetype=asset.mime_type,
+        download_name=asset_path.name,
+        conditional=False,
+        max_age=31536000,
+    )
+    response.set_etag(asset.sha256)
+    response.headers["X-Asset-SHA256"] = asset.sha256
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
 
