@@ -11,8 +11,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = REPO_ROOT / "publication" / "front-matter-authority.json"
 FRONT_COVER_PATH = REPO_ROOT / "publication" / "assets" / "33669713-CC6F-48A1-A36D-E6D04200014A.png"
 FRONT_COVER_SHA256 = "adedcf87e5b38be7c3e15048967a3dc70a8a1521ad4f5d35f6bb1939dd7cb34c"
+DEDICATION_PATH = REPO_ROOT / "publication" / "assets" / "49BD8356-7D82-4923-981F-FF0BB45EB283.png"
+DEDICATION_GIT_BLOB_SHA = "3b4f1f878606c20bc0ac4afdf65ca8ad0aee631c"
 BACK_COVER_PATH = REPO_ROOT / "publication" / "assets" / "back-cover.jpeg"
 BACK_COVER_SHA256 = "6b59c5d29bf561660210cfda6890e590a1bf48a34a37983a32135c876122cfb1"
+
+
+def git_blob_sha(payload: bytes) -> str:
+    header = f"blob {len(payload)}\0".encode("ascii")
+    return hashlib.sha1(header + payload).hexdigest()
 
 
 def test_controlled_authority_records_exact_required_sequence_and_approved_dedication():
@@ -22,7 +29,14 @@ def test_controlled_authority_records_exact_required_sequence_and_approved_dedic
     assert authority.dedication.content == (
         "For anyone who's ever felt lost, questioned the path being travelled or wondered if it's to late to start again"
     )
-    assert authority.dedication.presentation == "script"
+    assert authority.dedication.presentation == "image"
+    assert authority.dedication.asset_id == "dedication-approved"
+    assert authority.dedication.asset_path == "publication/assets/49BD8356-7D82-4923-981F-FF0BB45EB283.png"
+    assert authority.dedication.mime_type == "image/png"
+    assert authority.dedication.git_blob_sha == DEDICATION_GIT_BLOB_SHA
+    dedication_bytes = DEDICATION_PATH.read_bytes()
+    assert git_blob_sha(dedication_bytes) == DEDICATION_GIT_BLOB_SHA
+    assert authority.dedication.sha256 == hashlib.sha256(dedication_bytes).hexdigest()
 
 
 def test_front_cover_is_author_approved_materialized_and_exactly_sha_bound():
@@ -63,6 +77,12 @@ def test_canonical_repository_mismatch_is_rejected(tmp_path):
         load_front_matter_authority(target)
 
 
+def _copy_required_front_matter_assets(assets_dir: Path) -> None:
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    (assets_dir / DEDICATION_PATH.name).write_bytes(DEDICATION_PATH.read_bytes())
+    (assets_dir / "back-cover.jpeg").write_bytes(BACK_COVER_PATH.read_bytes())
+
+
 def _materialized_authority(tmp_path: Path, image_bytes: bytes, sha256: str) -> Path:
     payload = json.loads(AUTHORITY_PATH.read_text(encoding="utf-8"))
     payload["cover"] = {
@@ -75,9 +95,8 @@ def _materialized_authority(tmp_path: Path, image_bytes: bytes, sha256: str) -> 
     }
     authority_path = tmp_path / "publication" / "front-matter-authority.json"
     assets_dir = tmp_path / "publication" / "assets"
-    assets_dir.mkdir(parents=True)
+    _copy_required_front_matter_assets(assets_dir)
     (assets_dir / "front-cover.jpeg").write_bytes(image_bytes)
-    (assets_dir / "back-cover.jpeg").write_bytes(BACK_COVER_PATH.read_bytes())
     authority_path.write_text(json.dumps(payload), encoding="utf-8")
     return authority_path
 
@@ -119,7 +138,19 @@ def test_materialized_front_cover_path_traversal_is_rejected(tmp_path):
         "authority": "author:test",
     }
     target = tmp_path / "publication" / "front-matter-authority.json"
-    target.parent.mkdir()
+    _copy_required_front_matter_assets(tmp_path / "publication" / "assets")
     target.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(PublicationAssemblyError, match="asset path is invalid"):
+        load_front_matter_authority(target)
+
+
+def test_dedication_asset_git_blob_mismatch_is_rejected(tmp_path):
+    payload = json.loads(AUTHORITY_PATH.read_text(encoding="utf-8"))
+    payload["dedication"]["git_blob_sha"] = "0" * 40
+    target = tmp_path / "publication" / "front-matter-authority.json"
+    assets_dir = tmp_path / "publication" / "assets"
+    _copy_required_front_matter_assets(assets_dir)
+    (assets_dir / FRONT_COVER_PATH.name).write_bytes(FRONT_COVER_PATH.read_bytes())
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(PublicationAssemblyError, match="Git blob SHA does not match"):
         load_front_matter_authority(target)
