@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import csv
+import io
 import re
 import threading
 import time
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
 
 MANIFEST_PATH = "publication/publication-formatting-manifest.md"
+MANIFEST_CSV_PATH = "publication/publication-formatting-manifest.csv"
 PUBLICATION_DIR = "publication/chapters"
-APP_USER_AGENT = "memoir-reader-application/0.1"
+APP_USER_AGENT = "memoir-reader-application/0.2"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -78,17 +83,11 @@ class CanonicalBookSource:
         self._pdf_cache: dict[tuple[str, str], bytes] = {}
         self._lock = threading.RLock()
         self._session = requests.Session()
-        self._session.headers.update({"User-Agent": APP_USER_AGENT, "Accept": "application/vnd.github+json"})
+        self._session.headers.update({"User-Agent": APP_USER_AGENT})
 
     @property
-    def api_base(self) -> str:
-        return f"https://api.github.com/repos/{self.repo}"
-
-    def _get_json(self, url: str) -> Any:
-        response = self._session.get(url, timeout=15)
-        if response.status_code != 200:
-            raise SourceError(f"Canonical source request failed ({response.status_code})")
-        return response.json()
+    def git_base(self) -> str:
+        return f"https://github.com/{self.repo}.git"
 
     def _get_text(self, url: str) -> str:
         response = self._session.get(url, timeout=15)
@@ -96,23 +95,97 @@ class CanonicalBookSource:
             raise SourceError(f"Canonical source request failed ({response.status_code})")
         return response.text
 
+    @staticmethod
+    def _commit_from_git_advertisement(payload: bytes, ref: str) -> str:
+        text = payload.decode("latin1", errors="ignore")
+        ref_name = f"refs/heads/{ref}"
+        match = re.search(rf"([0-9a-f]{{40}})\s+{re.escape(ref_name)}(?:\x00|\n|\r)", text)
+        if match:
+            return match.group(1)
+
+        head_match = re.search(r"([0-9a-f]{40})\s+HEAD\x00[^\n]*symref=HEAD:([^\s\x00]+)", text)
+        if head_match and head_match.group(2) == ref_name:
+            return head_match.group(1)
+
+        raise SourceError("Canonical commit identity could not be established")
+
     def _resolve_commit(self) -> str:
-        data = self._get_json(f"{self.api_base}/commits/{self.ref}")
-        sha = data.get("sha")
-        if not isinstance(sha, str) or not COMMIT_RE.fullmatch(sha):
+        response = self._session.get(
+            f"{self.git_base}/info/refs?service=git-upload-pack",
+            headers={"Accept": "application/x-git-upload-pack-advertisement"},
+            timeout=15,
+        )
+        if response.status_code != 200:
+            raise SourceError(f"Canonical source request failed ({response.status_code})")
+        sha = self._commit_from_git_advertisement(response.content, self.ref)
+        if not COMMIT_RE.fullmatch(sha):
             raise SourceError("Canonical commit identity could not be established")
         return sha
 
-    def _manifest_text(self, commit_sha: str) -> str:
-        return self._get_text(
-            f"https://raw.githubusercontent.com/{self.repo}/{commit_sha}/{MANIFEST_PATH}"
-        )
+    def _raw_url(self, commit_sha: str, path: str) -> str:
+        encoded_path = "/".join(quote(part, safe="") for part in path.split("/"))
+        return f"https://raw.githubusercontent.com/{self.repo}/{commit_sha}/{encoded_path}"
 
-    def _publication_files(self, commit_sha: str) -> list[str]:
-        data = self._get_json(f"{self.api_base}/contents/{PUBLICATION_DIR}?ref={commit_sha}")
-        if not isinstance(data, list):
-            raise SourceError("Publication chapter directory is unavailable")
-        return [item["name"] for item in data if item.get("type") == "file" and isinstance(item.get("name"), str)]
+    def _manifest_text(self, commit_sha: str) -> str:
+        return self._get_text(self._raw_url(commit_sha, MANIFEST_PATH))
+
+    def _manifest_csv_text(self, commit_sha: str) -> str:
+        return self._get_text(self._raw_url(commit_sha, MANIFEST_CSV_PATH))
+
+    @staticmethod
+    def _extract_manifest_base_commit(manifest: str) -> str | None:
+        match = re.search(r"Governing manuscript base commit:\s*`([0-9a-f]{7,40})`", manifest)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _approved_rows_csv(manifest_csv: str) -> tuple[ApprovedChapter, ...]:
+        reader = csv.DictReader(io.StringIO(manifest_csv))
+        approved: list[ApprovedChapter] = []
+        required = {
+            "order",
+            "title",
+            "source_path",
+            "approval_status",
+            "pdf_output",
+            "page_count",
+            "pdf_text_compare",
+            "visual_qa",
+            "sync_status",
+        }
+        if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
+            raise SourceError("Publication CSV manifest is missing required fields")
+
+        for row in reader:
+            if row.get("approval_status") != "CURRENT_REPOSITORY_SOURCE":
+                continue
+            if row.get("pdf_text_compare") != "PASS" or row.get("visual_qa") != "PASS_100_PERCENT":
+                continue
+            if row.get("sync_status") != "branch-generated-verified":
+                continue
+
+            order = (row.get("order") or "").strip()
+            title = (row.get("title") or "").strip()
+            source = (row.get("source_path") or "").strip()
+            page_text = (row.get("page_count") or "").strip()
+            pdf_output = (row.get("pdf_output") or "").strip()
+            if not order or not title or not source or not page_text.isdigit() or not pdf_output:
+                raise SourceError(f"Approved manifest row is incomplete for order {order or '?'}")
+            if not pdf_output.startswith(f"{PUBLICATION_DIR}/") or not pdf_output.lower().endswith(".pdf"):
+                raise SourceError(f"Approved PDF path is invalid for order {order}")
+
+            approved.append(
+                ApprovedChapter(
+                    order=order,
+                    title=title,
+                    source=source,
+                    pages=int(page_text),
+                    pdf_file=PurePosixPath(pdf_output).name,
+                )
+            )
+
+        if not approved:
+            raise SourceError("No publication-approved chapters were established")
+        return tuple(approved)
 
     @staticmethod
     def _parse_markdown_table(manifest: str) -> list[dict[str, str]]:
@@ -127,11 +200,6 @@ class CanonicalBookSource:
                 continue
             rows.append(dict(zip(header, cells)))
         return rows
-
-    @staticmethod
-    def _extract_manifest_base_commit(manifest: str) -> str | None:
-        match = re.search(r"Governing manuscript base commit:\s*`([0-9a-f]{7,40})`", manifest)
-        return match.group(1) if match else None
 
     @classmethod
     def _approved_rows(cls, manifest: str, publication_files: list[str]) -> tuple[ApprovedChapter, ...]:
@@ -151,15 +219,7 @@ class CanonicalBookSource:
             matches = [name for name in pdf_files if name.startswith(prefix)]
             if len(matches) != 1:
                 raise SourceError(f"Expected exactly one approved PDF for order {order}")
-            approved.append(
-                ApprovedChapter(
-                    order=order,
-                    title=title,
-                    source=source,
-                    pages=int(page_text),
-                    pdf_file=matches[0],
-                )
-            )
+            approved.append(ApprovedChapter(order, title, source, int(page_text), matches[0]))
         if not approved:
             raise SourceError("No publication-approved chapters were established")
         return tuple(approved)
@@ -168,8 +228,8 @@ class CanonicalBookSource:
         if not COMMIT_RE.fullmatch(commit_sha):
             raise SourceError("Publication commit identity is invalid")
         manifest = self._manifest_text(commit_sha)
-        files = self._publication_files(commit_sha)
-        chapters = self._approved_rows(manifest, files)
+        manifest_csv = self._manifest_csv_text(commit_sha)
+        chapters = self._approved_rows_csv(manifest_csv)
         snapshot = BookSnapshot(
             repository=self.repo,
             requested_ref=self.ref,
@@ -227,7 +287,7 @@ class CanonicalBookSource:
             cached = self._pdf_cache.get(key)
             if cached is not None:
                 return cached
-        url = f"https://raw.githubusercontent.com/{self.repo}/{commit_sha}/{PUBLICATION_DIR}/{filename}"
+        url = self._raw_url(commit_sha, f"{PUBLICATION_DIR}/{filename}")
         response = self._session.get(url, timeout=30)
         if response.status_code != 200:
             raise SourceError(f"Approved publication asset could not be loaded ({response.status_code})")
