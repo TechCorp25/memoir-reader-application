@@ -9,9 +9,16 @@
   },
   "dedication": {
     "value": "For anyone who's ever felt lost, questioned the path being travelled or wondered if it's to late to start again",
-    "presentation": "script",
+    "presentation": "image",
     "approval_status": "AUTHOR_APPROVED",
-    "authority": "author-directive:2026-09-12"
+    "asset_id": "dedication-approved",
+    "asset_path": "publication/assets/49BD8356-7D82-4923-981F-FF0BB45EB283.png",
+    "git_blob_sha": "3b4f1f878606c20bc0ac4afdf65ca8ad0aee631c",
+    "mime_type": "image/png",
+    "pixel_width": 864,
+    "pixel_height": 1536,
+    "source_filename": "49BD8356-7D82-4923-981F-FF0BB45EB283.png",
+    "authority": "author-directive:2026-09-16T21:07+10:00; repository-upload-confirmed"
   },
   "cover": {
     "approval_status": "AUTHOR_APPROVED",

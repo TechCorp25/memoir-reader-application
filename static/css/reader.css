@@ -1,4 +1,20 @@
 @font-face {
+  font-family: "EB Garamond";
+  font-style: normal;
+  font-display: block;
+  font-weight: 400;
+  src: url("https://cdn.jsdelivr.net/fontsource/fonts/eb-garamond@5.3.0/latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "EB Garamond";
+  font-style: normal;
+  font-display: block;
+  font-weight: 600;
+  src: url("https://cdn.jsdelivr.net/fontsource/fonts/eb-garamond@5.3.0/latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
   font-family: "Allura";
   font-style: normal;
   font-display: swap;
@@ -73,6 +89,7 @@ body {
   min-height: 0;
   aspect-ratio: 2 / 3;
   overflow: hidden;
+  container-type: inline-size;
   background:
     radial-gradient(ellipse at 19% 16%, rgba(255,255,255,.34), transparent 38%),
     radial-gradient(ellipse at 78% 73%, rgba(128,105,70,.035), transparent 44%),
@@ -179,18 +196,41 @@ body {
 .title-page {
   display: grid;
   place-items: center;
-  padding: 13% 12% 24%;
+  padding: 13% 5% 24%;
   text-align: center;
 }
 
 .title-page h1 {
   margin: 0;
-  max-width: 88%;
-  font-size: clamp(1.35rem, 3.4vmin, 2.7rem);
-  font-weight: 500;
-  line-height: 1.13;
-  letter-spacing: .015em;
-  text-wrap: balance;
+  max-width: 96%;
+  font-family: var(--publication-serif);
+  font-size: clamp(1rem, 3.2vmin, 2.4rem);
+  font-size: clamp(1rem, 6.4cqw, 2.4rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: .008em;
+  white-space: nowrap;
+  text-wrap: nowrap;
+}
+
+.page-dedication {
+  background:
+    #f5f2ea url("/api/front-matter-asset/dedication-approved") center / cover no-repeat;
+}
+
+.page-dedication::after { display: none; }
+
+.page-dedication .dedication-page {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .dedication-page {

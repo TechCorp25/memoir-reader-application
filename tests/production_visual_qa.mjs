@@ -72,12 +72,55 @@ async function assertCover(page, name) {
   assert.equal(dimensions.objectFit, 'contain', `${name}: cover must preserve aspect ratio without cropping`);
 }
 
+async function assertTitlePage(page, name) {
+  const title = page.locator('.page-title .title-page h1');
+  await title.waitFor({ state: 'attached' });
+  const typography = await title.evaluate((node) => {
+    const style = getComputedStyle(node);
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return {
+      text: node.textContent,
+      fontFamily: style.fontFamily,
+      whiteSpace: style.whiteSpace,
+      lineRects: range.getClientRects().length,
+      scrollWidth: node.scrollWidth,
+      clientWidth: node.clientWidth,
+    };
+  });
+  assert.equal(typography.text, 'The Long Road To Nowhere', `${name}: title wording changed`);
+  assert.match(typography.fontFamily, /EB Garamond/i, `${name}: title page is not using EB Garamond`);
+  assert.equal(typography.whiteSpace, 'nowrap', `${name}: title page must prohibit wrapping`);
+  assert.equal(typography.lineRects, 1, `${name}: title page must render on exactly one line`);
+  assert.ok(typography.scrollWidth <= typography.clientWidth + 1, `${name}: one-line title overflows its box`);
+}
+
+async function assertDedicationPage(page, name) {
+  const sheet = page.locator('.page-dedication');
+  await sheet.waitFor({ state: 'attached' });
+  const presentation = await sheet.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      backgroundImage: style.backgroundImage,
+      overlay: getComputedStyle(node, '::after').display,
+    };
+  });
+  assert.match(
+    presentation.backgroundImage,
+    /dedication-approved/,
+    `${name}: dedication is not using the approved dedication artwork`,
+  );
+  assert.equal(presentation.overlay, 'none', `${name}: generated paper overlay must not alter the approved dedication artwork`);
+}
+
 async function assertSingleOpeningSequence(page, name) {
   const expected = ['cover', 'blank', 'title', 'blank', 'dedication', 'blank', 'index', 'blank', 'manuscript'];
   assert.deepEqual(await pageKinds(page), [expected[0]], `${name}: unexpected initial page`);
   for (let index = 1; index < expected.length; index += 1) {
     await clickNextAndWait(page);
     assert.deepEqual(await pageKinds(page), [expected[index]], `${name}: opening sequence mismatch at physical surface ${index + 1}`);
+    if (expected[index] === 'title') await assertTitlePage(page, name);
+    if (expected[index] === 'dedication') await assertDedicationPage(page, name);
   }
   const position = (await page.locator('[data-position]').textContent())?.trim();
   assert.equal(position, 'Page 1 of 105', `${name}: Chapter 1 must begin at manuscript Page 1`);
@@ -94,6 +137,8 @@ async function assertSpreadOpeningSequence(page, name) {
   for (const expected of spreads) {
     await clickNextAndWait(page);
     assert.deepEqual(await pageKinds(page), expected, `${name}: recto/verso opening spread mismatch`);
+    if (expected.includes('title')) await assertTitlePage(page, name);
+    if (expected.includes('dedication')) await assertDedicationPage(page, name);
   }
   const position = (await page.locator('[data-position]').textContent())?.trim();
   assert.equal(position, 'Page 1 of 105', `${name}: Chapter 1 must retain manuscript Page 1 in spread mode`);
@@ -121,6 +166,10 @@ if (publication.response.status === 503 && publication.payload.error === 'public
 assert.equal(publication.response.status, 200, `Physical publication endpoint returned HTTP ${publication.response.status}: ${JSON.stringify(publication.payload)}`);
 assert.equal(publication.payload.commit_sha, health.payload.commit_sha, 'Physical publication is not pinned to the health-reported memoir commit');
 assert.equal(publication.payload.front_matter_pages, 8, 'Front matter must contain exactly eight physical surfaces before Chapter 1');
+assert.equal(publication.payload.dedication_presentation, 'image', 'Dedication must use the approved image presentation');
+assert.equal(publication.payload.pages?.[4]?.kind, 'dedication', 'Physical surface 5 must be the dedication');
+assert.equal(publication.payload.pages?.[4]?.asset_id, 'dedication-approved', 'Dedication page is not bound to the approved asset');
+assert.equal(publication.payload.assets?.['dedication-approved']?.mime_type, 'image/png', 'Approved dedication asset is missing from the publication manifest');
 assert.equal(publication.payload.pages?.[8]?.kind, 'manuscript', 'Physical surface 9 must be Chapter 1');
 assert.equal(publication.payload.pages?.[8]?.display_number, 1, 'Chapter 1 must begin at manuscript Page 1');
 

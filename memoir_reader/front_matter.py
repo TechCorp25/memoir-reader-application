@@ -58,6 +58,25 @@ class FrontMatterAuthority:
         for asset in (self.cover, self.back_cover):
             if asset is not None and asset.approved and asset.asset_id == asset_id:
                 return asset
+
+        dedication = self.dedication
+        if (
+            dedication.approved
+            and dedication.presentation == "image"
+            and dedication.asset_id == asset_id
+            and dedication.asset_path
+            and dedication.mime_type
+            and dedication.sha256
+        ):
+            return ApprovedCover(
+                asset_id=dedication.asset_id,
+                source=f"{dedication.source}:{dedication.asset_path}",
+                sha256=dedication.sha256,
+                mime_type=dedication.mime_type,
+                approved=True,
+                asset_path=dedication.asset_path,
+            )
+
         raise PublicationAssemblyError("Requested front-matter asset is not publication-approved and materialized")
 
 
@@ -98,6 +117,11 @@ def _validate_image_bytes(payload: bytes, mime_type: str, label: str) -> None:
     check = signatures.get(mime_type)
     if check is None or not check(payload):
         raise PublicationAssemblyError(f"{label} bytes do not match the approved image type")
+
+
+def _git_blob_sha(payload: bytes) -> str:
+    header = f"blob {len(payload)}\0".encode("ascii")
+    return hashlib.sha1(header + payload).hexdigest()
 
 
 def _load_cover(
@@ -146,6 +170,59 @@ def _load_cover(
     raise PublicationAssemblyError(f"{label} approval status is invalid")
 
 
+def _load_dedication(data: dict[str, Any], *, asset_root: Path) -> ApprovedDedication:
+    if data.get("approval_status") != APPROVED:
+        raise PublicationAssemblyError("Dedication is not publication-approved")
+
+    content = str(data.get("value") or "")
+    authority = str(data.get("authority") or "")
+    presentation = str(data.get("presentation") or "script")
+    if not content or not authority:
+        raise PublicationAssemblyError("Dedication approval provenance is incomplete")
+
+    if presentation != "image":
+        return ApprovedDedication(
+            content=content,
+            source=authority,
+            approved=True,
+            presentation=presentation,
+        )
+
+    asset_id = str(data.get("asset_id") or "")
+    asset_path = str(data.get("asset_path") or "")
+    git_blob_sha = str(data.get("git_blob_sha") or "").lower()
+    mime_type = str(data.get("mime_type") or "")
+    if not all((asset_id, asset_path, git_blob_sha, mime_type)):
+        raise PublicationAssemblyError("Dedication image approval provenance is incomplete")
+    if len(git_blob_sha) != 40 or any(ch not in "0123456789abcdef" for ch in git_blob_sha):
+        raise PublicationAssemblyError("Dedication Git blob SHA is invalid")
+    if not mime_type.startswith("image/"):
+        raise PublicationAssemblyError("Dedication must be an image asset")
+
+    file_path = _safe_asset_path(asset_root, asset_path, "Dedication")
+    try:
+        payload = file_path.read_bytes()
+    except OSError as exc:
+        raise PublicationAssemblyError("Dedication approved asset could not be read") from exc
+
+    actual_git_blob_sha = _git_blob_sha(payload)
+    if actual_git_blob_sha != git_blob_sha:
+        raise PublicationAssemblyError("Dedication approved asset Git blob SHA does not match authority")
+    _validate_image_bytes(payload, mime_type, "Dedication")
+
+    return ApprovedDedication(
+        content=content,
+        source=authority,
+        approved=True,
+        presentation="image",
+        asset_id=asset_id,
+        asset_path=asset_path,
+        mime_type=mime_type,
+        sha256=hashlib.sha256(payload).hexdigest(),
+        git_blob_sha=git_blob_sha,
+    )
+
+
 def load_front_matter_authority(
     path: Path | str = FRONT_MATTER_AUTHORITY_PATH,
     *,
@@ -172,23 +249,10 @@ def load_front_matter_authority(
     if title.get("approval_status") != APPROVED or not str(title.get("value") or "").strip():
         raise PublicationAssemblyError("Book-title authority is incomplete")
 
-    dedication_data = _required_mapping(payload, "dedication")
-    if dedication_data.get("approval_status") != APPROVED:
-        raise PublicationAssemblyError("Dedication is not publication-approved")
-    dedication_value = str(dedication_data.get("value") or "")
-    dedication_authority = str(dedication_data.get("authority") or "")
-    if not dedication_value or not dedication_authority:
-        raise PublicationAssemblyError("Dedication approval provenance is incomplete")
-    dedication = ApprovedDedication(
-        content=dedication_value,
-        source=dedication_authority,
-        approved=True,
-        presentation=str(dedication_data.get("presentation") or "script"),
-    )
-
     # The authority file lives under publication/. Approved asset paths are
     # application-root-relative and therefore resolve one directory above it.
     asset_root = authority_path.resolve().parent.parent
+    dedication = _load_dedication(_required_mapping(payload, "dedication"), asset_root=asset_root)
     cover_status, cover = _load_cover(
         _required_mapping(payload, "cover"),
         label="Front cover",

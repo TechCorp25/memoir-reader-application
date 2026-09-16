@@ -47,6 +47,10 @@ def build_publication_payload(snapshot: SnapshotLike, authority: FrontMatterAuth
         raise ValueError("Physical publication page count failed integrity validation")
 
     assets = {authority.cover.asset_id: _asset_payload(authority.cover)}
+    dedication_asset_id = authority.dedication.asset_id
+    if authority.dedication.presentation == "image" and dedication_asset_id:
+        dedication_asset = authority.approved_asset(dedication_asset_id)
+        assets[dedication_asset.asset_id] = _asset_payload(dedication_asset)
     if authority.back_cover_ready and authority.back_cover is not None:
         assets[authority.back_cover.asset_id] = _asset_payload(authority.back_cover)
 
@@ -55,6 +59,7 @@ def build_publication_payload(snapshot: SnapshotLike, authority: FrontMatterAuth
         "commit_sha": snapshot.commit_sha,
         "book_title": authority.book_title,
         "dedication_presentation": authority.dedication.presentation,
+        "dedication_asset_id": dedication_asset_id,
         "manuscript_total_pages": snapshot.total_pages,
         "front_matter_pages": FRONT_MATTER_PAGE_COUNT,
         "physical_total_pages": len(pages),
