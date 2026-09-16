@@ -1,0 +1,51 @@
+name: Materialize approved back cover
+
+on:
+  push:
+    branches:
+      - materialize-approved-back-cover
+    paths:
+      - .github/workflows/materialize-approved-back-cover.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out controlled branch
+        uses: actions/checkout@v4
+        with:
+          ref: materialize-approved-back-cover
+          fetch-depth: 1
+
+      - name: Fetch exact approved back-cover bytes and verify authority hash
+        env:
+          APPROVED_URL: https://at.adobe.com/FPIvfIDvLQ2l1aQC
+          APPROVED_SHA256: 6b59c5d29bf561660210cfda6890e590a1bf48a34a37983a32135c876122cfb1
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 2 --retry-delay 2 "$APPROVED_URL" --output /tmp/back-cover.jpeg
+          printf '%s  %s\n' "$APPROVED_SHA256" /tmp/back-cover.jpeg | sha256sum --check --strict
+          python - <<'PY'
+          from pathlib import Path
+          payload = Path('/tmp/back-cover.jpeg').read_bytes()
+          if not payload.startswith(b'\xff\xd8\xff'):
+              raise SystemExit('Downloaded asset is not the approved JPEG byte stream')
+          PY
+
+      - name: Commit verified binary asset
+        run: |
+          set -euo pipefail
+          mkdir -p publication/assets
+          cp /tmp/back-cover.jpeg publication/assets/back-cover.jpeg
+          git add publication/assets/back-cover.jpeg
+          if git diff --cached --quiet; then
+            echo 'Approved back cover is already materialized.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Materialize approved back cover asset'
+          git push origin HEAD:materialize-approved-back-cover
