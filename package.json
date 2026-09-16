@@ -1,0 +1,10 @@
+{
+  "name": "memoir-reader-application",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Publication-fidelity digital reader for The Long Road To Nowhere",
+  "scripts": {
+    "test": "node --test tests/navigation.test.mjs"
+  }
+}
