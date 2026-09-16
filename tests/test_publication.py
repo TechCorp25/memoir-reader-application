@@ -29,7 +29,17 @@ CHAPTERS = (
     Chapter("02", "TWO", "chapters/02.md", 2, "02_TWO.pdf"),
 )
 SNAPSHOT = Snapshot("techcorp-DevApps/memoir", "a" * 40, 5, CHAPTERS)
-DEDICATION = ApprovedDedication("Exact approved words", "author:test", True, "script")
+DEDICATION = ApprovedDedication(
+    "Exact approved words",
+    "author:test",
+    True,
+    "image",
+    "dedication-approved",
+    "publication/assets/dedication.png",
+    "image/png",
+    "d" * 64,
+    "e" * 40,
+)
 
 
 def ready_authority() -> FrontMatterAuthority:
@@ -65,10 +75,13 @@ def ready_authority() -> FrontMatterAuthority:
 def test_payload_preserves_manuscript_pagination_inside_physical_sequence():
     payload = build_publication_payload(SNAPSHOT, ready_authority())
     assert payload["book_title"] == "The Long Road To Nowhere"
-    assert payload["dedication_presentation"] == "script"
+    assert payload["dedication_presentation"] == "image"
+    assert payload["dedication_asset_id"] == "dedication-approved"
     assert payload["manuscript_total_pages"] == 5
     assert payload["front_matter_pages"] == 8
     assert payload["physical_total_pages"] == 13
+    assert payload["pages"][4]["kind"] == "dedication"
+    assert payload["pages"][4]["asset_id"] == "dedication-approved"
     assert payload["pages"][8]["kind"] == "manuscript"
     assert payload["pages"][8]["display_number"] == 1
     assert payload["pages"][8]["chapter_order"] == "01"
@@ -90,6 +103,12 @@ def test_payload_exposes_only_verified_materialized_asset_urls():
         "url": "/api/front-matter-asset/front-cover-approved",
         "mime_type": "image/jpeg",
         "sha256": "b" * 64,
+    }
+    assert payload["assets"]["dedication-approved"] == {
+        "asset_id": "dedication-approved",
+        "url": "/api/front-matter-asset/dedication-approved",
+        "mime_type": "image/png",
+        "sha256": "d" * 64,
     }
     assert payload["assets"]["back-cover-approved"]["url"] == "/api/front-matter-asset/back-cover-approved"
 
