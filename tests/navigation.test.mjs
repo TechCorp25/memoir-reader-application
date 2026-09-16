@@ -27,8 +27,8 @@ test('spread anchor preserves the current semantic page pair', () => {
   assert.equal(normalizeAnchor(3, 'spread', 105), 2);
 });
 
-test('wide landscape phone remains single-page when two pages would be cramped', () => {
-  assert.equal(modeForViewport(844, 390), 'single');
+test('landscape phone uses a two-page spread', () => {
+  assert.equal(modeForViewport(844, 390), 'spread');
 });
 
 test('portrait tablet remains single-page', () => {
@@ -39,6 +39,6 @@ test('landscape tablet can use a two-page spread', () => {
   assert.equal(modeForViewport(1180, 820), 'spread');
 });
 
-test('constrained browser window remains single-page', () => {
+test('constrained browser window remains single-page when not sufficiently landscape', () => {
   assert.equal(modeForViewport(850, 700), 'single');
 });
