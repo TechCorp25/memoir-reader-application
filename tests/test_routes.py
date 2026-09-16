@@ -1,11 +1,17 @@
+import hashlib
+from pathlib import Path
+
 from memoir_reader import create_app
 from memoir_reader.assembly import ApprovedCover, ApprovedDedication
 from memoir_reader.front_matter import FrontMatterAuthority, REQUIRED_SEQUENCE
 from memoir_reader.source import ApprovedChapter, BookSnapshot, SourceError
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 COMMIT = "a" * 40
 FRONT_COVER_SHA256 = "adedcf87e5b38be7c3e15048967a3dc70a8a1521ad4f5d35f6bb1939dd7cb34c"
+DEDICATION_PATH = REPO_ROOT / "publication" / "assets" / "49BD8356-7D82-4923-981F-FF0BB45EB283.png"
+DEDICATION_SHA256 = hashlib.sha256(DEDICATION_PATH.read_bytes()).hexdigest()
 BACK_COVER_SHA256 = "6b59c5d29bf561660210cfda6890e590a1bf48a34a37983a32135c876122cfb1"
 CHAPTERS = (
     ApprovedChapter("01", "ONE", "chapters/01.md", 3, "01_ONE.pdf"),
@@ -57,10 +63,21 @@ def ready_authority():
         approved=True,
         asset_path="publication/assets/back-cover.jpeg",
     )
+    dedication = ApprovedDedication(
+        content="Exact approved words",
+        source="author:test",
+        approved=True,
+        presentation="image",
+        asset_id="dedication-approved",
+        asset_path="publication/assets/dedication.png",
+        mime_type="image/png",
+        sha256="d" * 64,
+        git_blob_sha="e" * 40,
+    )
     return FrontMatterAuthority(
         canonical_repository="techcorp-DevApps/memoir",
         book_title="The Long Road To Nowhere",
-        dedication=ApprovedDedication("Exact approved words", "author:test", True),
+        dedication=dedication,
         cover_status="AUTHOR_APPROVED",
         cover=front,
         back_cover_status="AUTHOR_APPROVED",
@@ -133,9 +150,12 @@ def test_publication_endpoint_returns_commit_pinned_physical_model_when_ready(mo
     assert payload["front_matter_pages"] == 8
     assert payload["physical_total_pages"] == 13
     assert payload["pages"][0]["kind"] == "cover"
+    assert payload["pages"][4]["kind"] == "dedication"
+    assert payload["pages"][4]["asset_id"] == "dedication-approved"
     assert payload["pages"][8]["kind"] == "manuscript"
     assert payload["pages"][8]["display_number"] == 1
     assert payload["assets"]["front-cover-approved"]["url"] == "/api/front-matter-asset/front-cover-approved"
+    assert payload["assets"]["dedication-approved"]["url"] == "/api/front-matter-asset/dedication-approved"
     assert payload["assets"]["back-cover-approved"]["url"] == "/api/front-matter-asset/back-cover-approved"
     assert response.headers["X-Memoir-Commit"] == COMMIT
     assert response.headers["Cache-Control"] == "no-store"
@@ -154,6 +174,15 @@ def test_materialized_front_cover_route_is_available_and_sha_bound():
     assert response.mimetype == "image/png"
     assert response.data.startswith(b"\x89PNG\r\n\x1a\n")
     assert response.headers["X-Asset-SHA256"] == FRONT_COVER_SHA256
+    assert response.headers["Cache-Control"] == "public, max-age=31536000, immutable"
+
+
+def test_materialized_dedication_route_is_available_and_sha_bound():
+    response = client_for(FakeSource()).get("/api/front-matter-asset/dedication-approved")
+    assert response.status_code == 200
+    assert response.mimetype == "image/png"
+    assert response.data.startswith(b"\x89PNG\r\n\x1a\n")
+    assert response.headers["X-Asset-SHA256"] == DEDICATION_SHA256
     assert response.headers["Cache-Control"] == "public, max-age=31536000, immutable"
 
 
