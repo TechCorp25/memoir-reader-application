@@ -54,6 +54,21 @@ def test_author_directed_opening_sequence_is_accepted_only_with_its_canonical_sy
     ]
 
 
+def test_formatted_opening_proofs_preserve_the_complete_approved_sequence():
+    manifest = AUTHOR_DIRECTED_SEQUENCE_MANIFEST.replace(
+        "publication/chapters/01_MAGIC_TRICK.pdf,4,NOT_APPLICABLE,PASS,PASS; font=PASS,PASS_100_PERCENT,,canonical-sequence-2026-09-22",
+        "publication/chapters/01_MAGIC_TRICK.pdf,10,NOT_APPLICABLE,PASS,PASS; font=PASS,PASS_100_PERCENT,,canonical-sequence-2026-09-22-formatting",
+    ).replace(
+        "publication/chapters/04_STARTING_MONDAY.pdf,7,NOT_APPLICABLE,PASS,PASS; font=PASS,PASS_100_PERCENT,,canonical-sequence-2026-09-22",
+        "publication/chapters/04_STARTING_MONDAY.pdf,7,NOT_APPLICABLE,PASS,PASS; font=PASS,PASS_100_PERCENT,,canonical-sequence-2026-09-22-formatting",
+    )
+    chapters = CanonicalBookSource._approved_rows_csv(manifest)
+    assert [(chapter.order, chapter.pages) for chapter in chapters] == [
+        ("01", 10), ("02", 12), ("03", 9), ("04", 7)
+    ]
+    assert sum(chapter.pages for chapter in chapters) == 38
+
+
 def test_manifest_base_commit_is_captured():
     assert CanonicalBookSource._extract_manifest_base_commit(MANIFEST) == "abcdef1234567890"
 

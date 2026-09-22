@@ -26,6 +26,7 @@ COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 APPROVED_PUBLICATION_PROFILES = frozenset(
     {
         ("AUTHOR_DIRECTED_COMPLETE", "canonical-sequence-2026-09-22"),
+        ("AUTHOR_DIRECTED_COMPLETE", "canonical-sequence-2026-09-22-formatting"),
         ("CURRENT_REPOSITORY_SOURCE", "branch-generated-verified"),
     }
 )
