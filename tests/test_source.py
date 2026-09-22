@@ -16,6 +16,14 @@ CSV_MANIFEST = """order,title,source_path,source_blob_sha,approval_status,docx_o
 03,APPROVED TWO,chapters/03.md,ghi,CURRENT_REPOSITORY_SOURCE,publication/chapters/03_APPROVED_TWO.docx,publication/chapters/03_APPROVED_TWO.pdf,2,PASS,PASS,PASS; font=PASS,PASS_100_PERCENT,,branch-generated-verified
 """
 
+AUTHOR_DIRECTED_SEQUENCE_MANIFEST = """order,title,source_path,source_blob_sha,approval_status,docx_output,pdf_output,page_count,docx_text_compare,pdf_text_compare,render_preflight,visual_qa,concern,sync_status
+01,MAGIC TRICK,chapters/01_MagicTrick.md,aefd77356524bb78f37415e6f06d266ce4670af5,AUTHOR_DIRECTED_COMPLETE,,publication/chapters/01_MAGIC_TRICK.pdf,4,NOT_APPLICABLE,PASS,PASS; font=PASS,PASS_100_PERCENT,,canonical-sequence-2026-09-22
+02,FOUR FLIGHTS,chapters/02_FourFlights.md,abc37bbe040899fa6e01d4d4dd64273dfc276c1d,AUTHOR_DIRECTED_COMPLETE,,publication/chapters/02_FOUR_FLIGHTS.pdf,12,NOT_APPLICABLE,PASS,PASS; font=PASS,PASS_100_PERCENT,,canonical-sequence-2026-09-22
+03,STEPS TO FREEDOM,chapters/03_StepsToFreedom.md,1cfd0578151afc1374ed031f4061672f3cc430bd,AUTHOR_DIRECTED_COMPLETE,output/publication/03_STEPS_TO_FREEDOM_publication_master.docx,publication/chapters/03_STEPS_TO_FREEDOM.pdf,9,PASS,PASS,PASS; font=PASS,PASS_100_PERCENT,,canonical-sequence-2026-09-22
+04,STARTING MONDAY,chapters/04_StartingMonday.md,99fdaf010c4a53f83cb8180d4b7b13a08e954f85,AUTHOR_DIRECTED_COMPLETE,,publication/chapters/04_STARTING_MONDAY.pdf,7,NOT_APPLICABLE,PASS,PASS; font=PASS,PASS_100_PERCENT,,canonical-sequence-2026-09-22
+05,UNVERIFIED,chapters/05.md,bad,AUTHOR_DIRECTED_COMPLETE,,publication/chapters/05_UNVERIFIED.pdf,1,NOT_APPLICABLE,PASS,PASS; font=PASS,PASS_100_PERCENT,,branch-generated-verified
+"""
+
 
 def test_approved_rows_only_include_qa_passed_publication_files():
     files = ["01_APPROVED.pdf", "02_BLOCKED.pdf", "03_APPROVED_TWO.pdf"]
@@ -28,6 +36,22 @@ def test_csv_manifest_drives_approved_pdf_paths_without_directory_listing():
     chapters = CanonicalBookSource._approved_rows_csv(CSV_MANIFEST)
     assert [chapter.pdf_file for chapter in chapters] == ["01_APPROVED.pdf", "03_APPROVED_TWO.pdf"]
     assert sum(chapter.pages for chapter in chapters) == 5
+
+
+def test_author_directed_opening_sequence_is_accepted_only_with_its_canonical_sync_state():
+    chapters = CanonicalBookSource._approved_rows_csv(AUTHOR_DIRECTED_SEQUENCE_MANIFEST)
+    assert [(chapter.order, chapter.title, chapter.pages) for chapter in chapters] == [
+        ("01", "MAGIC TRICK", 4),
+        ("02", "FOUR FLIGHTS", 12),
+        ("03", "STEPS TO FREEDOM", 9),
+        ("04", "STARTING MONDAY", 7),
+    ]
+    assert [chapter.pdf_file for chapter in chapters] == [
+        "01_MAGIC_TRICK.pdf",
+        "02_FOUR_FLIGHTS.pdf",
+        "03_STEPS_TO_FREEDOM.pdf",
+        "04_STARTING_MONDAY.pdf",
+    ]
 
 
 def test_manifest_base_commit_is_captured():

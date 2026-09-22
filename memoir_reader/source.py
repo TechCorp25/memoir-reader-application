@@ -19,6 +19,17 @@ PUBLICATION_DIR = "publication/chapters"
 APP_USER_AGENT = "memoir-reader-application/0.2"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 
+# Publication eligibility is established by the canonical repository's paired
+# approval and synchronisation states. Keep the pairing explicit so that a new
+# or partially-updated manifest state cannot become reader-visible merely by
+# reusing one trusted value.
+APPROVED_PUBLICATION_PROFILES = frozenset(
+    {
+        ("AUTHOR_DIRECTED_COMPLETE", "canonical-sequence-2026-09-22"),
+        ("CURRENT_REPOSITORY_SOURCE", "branch-generated-verified"),
+    }
+)
+
 
 class SourceError(RuntimeError):
     pass
@@ -156,11 +167,13 @@ class CanonicalBookSource:
             raise SourceError("Publication CSV manifest is missing required fields")
 
         for row in reader:
-            if row.get("approval_status") != "CURRENT_REPOSITORY_SOURCE":
+            publication_profile = (
+                (row.get("approval_status") or "").strip(),
+                (row.get("sync_status") or "").strip(),
+            )
+            if publication_profile not in APPROVED_PUBLICATION_PROFILES:
                 continue
             if row.get("pdf_text_compare") != "PASS" or row.get("visual_qa") != "PASS_100_PERCENT":
-                continue
-            if row.get("sync_status") != "branch-generated-verified":
                 continue
 
             order = (row.get("order") or "").strip()

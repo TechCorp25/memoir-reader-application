@@ -4,7 +4,7 @@ A publication-fidelity digital reader for **The Long Road To Nowhere**.
 
 ## Source integrity
 
-The application does not store or edit manuscript prose. At runtime it resolves the canonical repository `techcorp-DevApps/memoir`, pins the current `main` commit, reads `publication/publication-formatting-manifest.md`, and exposes only chapter PDFs whose manifest status is `PDF text = PASS` and `Visual QA = PASS_100_PERCENT`.
+The application does not store or edit manuscript prose. At runtime it resolves the canonical repository `techcorp-DevApps/memoir`, pins the current `main` commit, reads the publication manifests, and exposes only chapter PDFs whose canonical approval/synchronisation profile is explicitly trusted and whose PDF text and visual QA checks pass. This includes the author-directed completed opening sequence recorded on 22 September 2026.
 
 If the canonical source or approval state cannot be verified, the reader fails closed rather than silently using stale content.
 
