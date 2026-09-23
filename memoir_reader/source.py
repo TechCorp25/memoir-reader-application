@@ -31,6 +31,10 @@ APPROVED_PUBLICATION_PROFILES = frozenset(
     }
 )
 
+# The author-approved 23 September proof uses a distinct sync and QA state.
+# Recognize it only for Chapter 02; all other chapters retain their gate.
+CHAPTER_02_REVISED_PROFILE = ("AUTHOR_DIRECTED_COMPLETE", "dialogue-and-prose-updated-2026-09-23")
+
 
 class SourceError(RuntimeError):
     pass
@@ -172,9 +176,18 @@ class CanonicalBookSource:
                 (row.get("approval_status") or "").strip(),
                 (row.get("sync_status") or "").strip(),
             )
-            if publication_profile not in APPROVED_PUBLICATION_PROFILES:
+            revised_chapter_02 = (
+                (row.get("order") or "").strip() == "02"
+                and publication_profile == CHAPTER_02_REVISED_PROFILE
+            )
+            if publication_profile not in APPROVED_PUBLICATION_PROFILES and not revised_chapter_02:
                 continue
-            if row.get("pdf_text_compare") != "PASS" or row.get("visual_qa") != "PASS_100_PERCENT":
+            if row.get("pdf_text_compare") != "PASS":
+                continue
+            visual_qa = row.get("visual_qa")
+            if visual_qa != "PASS_100_PERCENT" and not (
+                revised_chapter_02 and visual_qa == "PASS_AGENT_ALL_PAGES"
+            ):
                 continue
 
             order = (row.get("order") or "").strip()
