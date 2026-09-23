@@ -110,6 +110,17 @@ body {
   isolation: isolate;
 }
 
+/* The same stock as the approved dedication, softened for typeset pages. */
+.page-sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url("paper-texture.webp") center / 100% 100% no-repeat;
+  opacity: .42;
+}
+
 .book-stage.is-spread .page-sheet:first-child {
   box-shadow: -12px 18px 34px rgba(0,0,0,.26), inset -11px 0 18px -16px rgba(32,24,16,.45);
 }
@@ -138,7 +149,7 @@ body {
   box-shadow: 0 20px 42px rgba(0,0,0,.38), 5px 3px 0 rgba(239,234,222,.16), 8px 5px 12px rgba(0,0,0,.18);
 }
 
-.page-cover::after { display: none; }
+.page-cover::before, .page-cover::after { display: none; }
 
 .book-stage.is-cover-state .page-cover {
   border-radius: 2px 4px 4px 2px;
@@ -230,7 +241,7 @@ body {
     #f5f2ea url("/api/front-matter-asset/dedication-approved") center / cover no-repeat;
 }
 
-.page-dedication::after { display: none; }
+.page-dedication::before, .page-dedication::after { display: none; }
 
 .page-dedication .dedication-page {
   position: absolute;
